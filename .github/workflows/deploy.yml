@@ -71,12 +71,19 @@ jobs:
             cp "$UNIT" /etc/systemd/system/
             systemctl daemon-reload
             systemctl restart organism-nursery.service
-            sleep 4
           fi
           chown www-data:www-data "${INSTALL_DIR}/data/baby_state.json" 2>/dev/null || true
           chmod 664 "${INSTALL_DIR}/data/baby_state.json" 2>/dev/null || true
           systemctl is-active organism-nursery.service
-          curl -sf --max-time 10 http://127.0.0.1:8765/organism/api/baby/ready >/dev/null && echo "nursery ok"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf --max-time 15 http://127.0.0.1:8765/organism/api/baby/ready >/dev/null; then
+              echo "nursery ok (attempt ${i})"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::nursery not ready after retries"
+          exit 1
           REMOTE
 
           rm -f "$KEY_FILE"
