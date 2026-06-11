@@ -26,7 +26,6 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.PRIVATE_SSH_KEY || secrets.SSH_PRIVATE_KEY }}
           DEPLOY_HOST: 46.225.222.101
           DEPLOY_USER: root
-          RESTART_TRAIN: ${{ github.event_name == 'workflow_dispatch' && inputs.restart_training && '1' || '0' }}
         run: |
           set -euo pipefail
           if [[ -z "${SSH_PRIVATE_KEY:-}" ]]; then
