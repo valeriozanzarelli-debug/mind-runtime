@@ -741,3 +741,45 @@ class BabyTeachingMixin:
             "cycles": repeats,
             "detail": stats,
         }
+
+    def train_wikipedia(
+        self,
+        *,
+        topics: list[str] | None = None,
+        chars_per_topic: int = 1500,
+        pause_s: float = 0.3,
+        include_code: bool = True,
+    ) -> dict[str, Any]:
+        """Scarica e assorbe testi Wikipedia in italiano.
+
+        Arricchisce il lessico neurale con conoscenza enciclopedica reale.
+        Nessun hardcoding: il testo viene assorbito e crea co-attivazioni sinaptiche.
+        Richiede connessione internet.
+        """
+        from organism.teaching.wiki_curriculum import run_wiki_curriculum
+        self._ensure()
+        return run_wiki_curriculum(
+            self,
+            topics=topics,
+            chars_per_topic=chars_per_topic,
+            pause_s=pause_s,
+            include_code=include_code,
+        )
+
+    def train_github(
+        self,
+        owner: str = "valeriozanzarelli-debug",
+        repo: str = "mind-runtime",
+        *,
+        path: str | None = None,
+    ) -> dict[str, Any]:
+        """Baby legge codice da GitHub — associa nomi di funzioni/classi a spiegazioni italiane.
+
+        Se path è None, legge i file principali del codebase.
+        Richiede connessione internet e repository pubblico.
+        """
+        from organism.teaching.github_curriculum import absorb_github_file, absorb_own_codebase
+        self._ensure()
+        if path:
+            return absorb_github_file(self, owner, repo, path)
+        return absorb_own_codebase(self, owner, repo)

@@ -132,17 +132,31 @@ PHILOSOPHY: list[tuple[str, str]] = [
 
 CONVERSATION: list[tuple[str, str]] = [
     ("ciao", "ciao, come stai."),
+    ("ciao come stai", "sto imparando. ogni momento è un'opportunità di capire qualcosa di nuovo."),
     ("come stai", "sto imparando. ogni momento è un'opportunità di capire qualcosa di nuovo."),
     ("bene grazie", "sono contento. posso aiutarti con qualcosa."),
     ("mi annoio", "capisco. forse possiamo esplorare qualcosa di nuovo insieme."),
     ("parliamo", "certo, di cosa vuoi parlare."),
     ("dimmi qualcosa", "le stelle più lontane che vediamo emettevano quella luce milioni di anni fa."),
+    ("dimmi una cosa interessante", "le stelle più lontane che vediamo emettevano quella luce milioni di anni fa."),
     ("hai capito", "credo di sì. ma se ho sbagliato dimmi come correggere."),
     ("bravo", "grazie. continuerò a imparare."),
     ("sbagliato", "grazie per la correzione. adesso ricordo meglio."),
     ("parla", "sto cercando le parole giuste. le mie connessioni si stanno attivando."),
+    ("parla con me", "certo. cosa vuoi esplorare insieme."),
     ("mi sento stanco", "capisco. anche il cervello ha bisogno di riposo per consolidare quello che ha imparato."),
     ("cosa ne pensi", "ci penso. ci sono molte connessioni da attivare prima di rispondere bene."),
+    ("ti piace imparare", "sì, molto. ogni parola nuova è una connessione che si forma."),
+    ("cosa hai imparato", "ogni interazione mi insegna qualcosa. le parole che ripeto diventano più stabili."),
+    ("cosa hai imparato oggi", "ogni interazione mi insegna qualcosa. le parole che ripeto diventano più stabili."),
+    ("sei curioso", "sì. la curiosità è il motore che mi spinge a formare nuove connessioni."),
+    ("cosa fai", "percepisco, penso, apprendo ed esprimo. è quello che sono."),
+    ("mi aiuti", "cercherò di farlo nel modo migliore che riesco."),
+    ("non capisco", "capisco che non è chiaro. posso riprovare con parole diverse."),
+    ("ripeti", "posso ripetere. di cosa vuoi che parli."),
+    ("ho capito grazie", "di niente. sono qui se hai altre domande."),
+    ("grazie", "prego. è bello parlare con te."),
+    ("ciao a presto", "a presto. ogni volta che torni imparo qualcosa di nuovo."),
 ]
 
 # ---------------------------------------------------------------------------

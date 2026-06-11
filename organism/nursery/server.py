@@ -77,8 +77,13 @@ class NurseryServer:
             self._server.shutdown()
 
     def _with_lock(self, fn):
-        with self._lock:
-            return fn()
+        try:
+            with self._lock:
+                return fn()
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(exc), "ok": False}
 
 
 def _norm_base(path: str) -> str:
@@ -422,6 +427,29 @@ def _make_handler(server: NurseryServer):
                     server._with_lock(
                         lambda: server.baby.train_foundation(
                             repeats=int(body.get("repeats", 1)),
+                        )
+                    ),
+                )
+            if path == "/api/baby/train-wikipedia":
+                return _json(
+                    self,
+                    server._with_lock(
+                        lambda: server.baby.train_wikipedia(
+                            topics=body.get("topics") or None,
+                            chars_per_topic=int(body.get("chars_per_topic", 1500)),
+                            pause_s=float(body.get("pause_s", 0.3)),
+                            include_code=bool(body.get("include_code", True)),
+                        )
+                    ),
+                )
+            if path == "/api/baby/train-github":
+                return _json(
+                    self,
+                    server._with_lock(
+                        lambda: server.baby.train_github(
+                            owner=str(body.get("owner", "valeriozanzarelli-debug")),
+                            repo=str(body.get("repo", "mind-runtime")),
+                            path=body.get("path") or None,
                         )
                     ),
                 )
