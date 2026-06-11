@@ -106,7 +106,8 @@ class SpeechComposer:
             )
         if body and (self._looks_garbage(body, thought) or is_babble(body, min_words=4)):
             body = self._honest_unknown(thought, motor, amygdala=amygdala) or ""
-        if not body or is_babble(body, min_words=5):
+        # When a pathway is explicitly primed trust its output even if short.
+        if not body or (not pathway_primed and is_babble(body, min_words=5)):
             body = self._mature_discourse(
                 thought,
                 heard=heard,
@@ -115,7 +116,7 @@ class SpeechComposer:
             )
         if not body:
             body = self._from_thought(thought, motor, min_words=2, avoid=avoid)
-        if body and is_babble(body, min_words=5):
+        if body and (not pathway_primed) and is_babble(body, min_words=5):
             body = self._mature_discourse(
                 thought,
                 heard=heard,

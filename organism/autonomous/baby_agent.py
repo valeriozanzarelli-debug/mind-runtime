@@ -1353,10 +1353,14 @@ class BabyAgent:
         own = self._normalize_phrase(self._last_baby_spoke)
         if not own:
             return False
-        if p == own or p in own or own in p:
-            return True
         pw = {w for w in p.split() if len(w) > 2}
         ow = {w for w in own.split() if len(w) > 2}
+        # Single-word inputs are rarely genuine echoes; only trigger for exact-match
+        # within a very short window (TTS latency), not for substring matches.
+        if len(pw) < 2:
+            return time.time() - self._last_spoke_wall_t < 3.0 and p == own
+        if p == own or p in own or own in p:
+            return True
         if pw and ow:
             overlap = len(pw & ow) / max(len(pw), len(ow))
             if overlap >= 0.55:

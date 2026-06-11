@@ -6,6 +6,19 @@ import hashlib
 from typing import Any
 
 
+def gray_to_grid(flat: list[int] | tuple[int, ...], width: int, height: int) -> list[list[int]]:
+    """Reshapes a flat luminance array (from browser getImageData) to a 2-D grid."""
+    data = list(flat)
+    grid: list[list[int]] = []
+    for y in range(height):
+        row: list[int] = []
+        for x in range(width):
+            idx = y * width + x
+            row.append(int(data[idx]) if idx < len(data) else 0)
+        grid.append(row)
+    return grid
+
+
 def scene_signature(grid: list[list[int]]) -> str:
     if not grid or not grid[0]:
         return "empty"

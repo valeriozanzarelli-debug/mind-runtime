@@ -148,7 +148,7 @@ class LinguisticNarrator:
         raw_words = self._apply_lateral_inhibition(raw_words)
         words = self._insert_modifiers(raw_words, modifiers)
 
-        punct = "?" if heard.strip().endswith("?") or any(
+        punct = "?" if (heard or "").strip().endswith("?") or any(
             s.startswith("QUESTION:") for s in thought.symbols
         ) else "."
 
