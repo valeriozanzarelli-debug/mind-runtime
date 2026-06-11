@@ -112,7 +112,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self.self_learner = SelfLearner()
         self.tasks = TaskRunner()
         self.brain_growth = BrainGrowth()
-        self.working_memory = WorkingMemory(capacity=7)
+        self.working_memory = WorkingMemory(capacity=24)
         self.photo_memory = PhotographicMemory(capacity=2000)
         self.episodic_memory = EpisodicMemory(short_slots=32, long_capacity=1200)
         self.visual_imagination = VisualImagination(self.photo_memory)
@@ -222,6 +222,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                     themes.append(lb)
 
     def _bootstrap_layer2(self) -> dict[str, Any]:
+        """Inizializzazione rapida al boot — solo capacità linguistica strutturale.
+
+        Volontariamente leggera: crea la struttura sintattica ma non popola
+        il vocabolario semantico. Usa train_foundation() per il training completo.
+        """
         stats = self.narrator.bootstrap_curriculum(repeats=3)
         return {"syntax": stats, "narrator": self.narrator.stats()}
 
@@ -240,20 +245,27 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         text: str | None,
         *,
         vision_fresh: bool = False,
-    ) -> tuple[bool, str | None, list[str]]:
-        """Attiva percorsi sinaptici appresi — hint lessicali, non copia scriptata."""
+    ) -> tuple[bool, str | None, list[str], str]:
+        """Attiva percorsi sinaptici appresi — hint lessicali, non copia scriptata.
+
+        Ritorna (has_path, code_out, pathway_words, dialogue_text).
+        dialogue_text è la risposta completa appresa (stringa intera), usabile
+        direttamente se il lessico può articolarla.
+        """
         has_path = False
         code_out: str | None = None
         pathway_words: list[str] = []
+        dialogue_text = ""
         if text and self.speech:
             say, kind = self.dialogue.respond(text)
             if say and kind == "code":
-                return True, say, []
+                return True, say, [], ""
             if say:
                 for w in _tokens_from_heard(text):
                     self.composer.absorb(w, boost=0.35)
                 self.speech.hear(text, boost=0.45)
                 pathway_words = _tokens_from_heard(say)
+                dialogue_text = say
                 has_path = True
             else:
                 scene = self._match_scene_phrase(text)
@@ -288,7 +300,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                     if not w.startswith(("VIS:", "OBJ:", "COL:", "SCENE:")):
                         self.composer.lexicon.prime_word(w, boost=0.35)
                         has_path = True
-        return has_path, code_out, pathway_words
+        return has_path, code_out, pathway_words, dialogue_text
 
     def _wire_from_input(
         self,
@@ -343,7 +355,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         grown = org.brain.synapse_count - self._synapses_at_birth
         wave_phase = self.waves.last.phase
         vis_themes = self._visual_themes()
-        has_path, code_out, pathway_words = self._prime_learned_pathways(
+        has_path, code_out, pathway_words, dialogue_text = self._prime_learned_pathways(
             org, skey, heard, vision_fresh=self._vision_fresh
         )
         if not code_out and heard:
@@ -630,6 +642,59 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
+        elif dialogue_text and wants_voice:
+            # Risposta dialogica appresa — usata DIRETTAMENTE per risposte lunghe (>= 5 parole).
+            # Risposte brevi passano al percorso emergente (produce/long_form) con pathway_words.
+            import re as _re
+            _dt_words = _re.findall(r"[a-zàèéìòù']+", dialogue_text.lower())
+            _dt_words = [w for w in _dt_words if len(w) > 2]
+            _artic = sum(1 for w in _dt_words if self.composer._articulable(w, min_exposure=0.25))
+            if len(_dt_words) >= 5 and _artic >= max(3, len(_dt_words) // 2):
+                _text = dialogue_text.strip()
+                if _text and _text[-1] not in ".?!":
+                    _text += "."
+                _text = _text[0].upper() + _text[1:]
+                _plan = self.speech.plan_from_text(_text) if self.speech else None
+                composed = ComposedSpeech(
+                    text=_text,
+                    kind="speech",
+                    from_thought=True,
+                    thought_used=thought.themes[:10],
+                    motor_plan=_plan,
+                )
+            elif long_form:
+                composed = self.composer.long_form(
+                    thought=thought,
+                    motor=self.speech,
+                    heard=heard,
+                    memory_themes=memory_themes,
+                )
+            else:
+                # Risposta breve → produce() con pathway_words come guida
+                speech_mode = "speak" if heard else ws.mode
+                if speech_mode not in ("speak", "reflect", "flow"):
+                    speech_mode = "speak"
+                recent_flat = [
+                    w for s in self._recent_spokes[-6:]
+                    for w in s.replace(".", "").replace("?", "").split()
+                    if len(w) > 2
+                ]
+                conv_ctx = self.working_memory.context_words(limit=8)
+                enriched_memory = list(dict.fromkeys((memory_themes or []) + conv_ctx))[:16]
+                composed = self.composer.produce(
+                    thought=thought,
+                    motor=self.speech,
+                    mode=speech_mode,
+                    reflective=False,
+                    pathway_primed=bool(pathway_words),
+                    pathway_words=pathway_words,
+                    amygdala=self.amygdala,
+                    recent_words=recent_flat,
+                    heard=heard,
+                    memory_themes=enriched_memory,
+                    valence=affect_valence,
+                    dialogue_text=dialogue_text,
+                )
         elif long_form and wants_voice:
             composed = self.composer.long_form(
                 thought=thought,
@@ -649,6 +714,9 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 for w in s.replace(".", "").replace("?", "").split()
                 if len(w) > 2
             ]
+            # Arricchisci i memory_themes con il contesto conversazionale corrente
+            conv_ctx = self.working_memory.context_words(limit=8)
+            enriched_memory = list(dict.fromkeys((memory_themes or []) + conv_ctx))[:16]
             composed = self.composer.produce(
                 thought=thought,
                 motor=self.speech,
@@ -659,8 +727,9 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 amygdala=self.amygdala,
                 recent_words=recent_flat,
                 heard=heard,
-                memory_themes=memory_themes,
+                memory_themes=enriched_memory,
                 valence=affect_valence,
+                dialogue_text=dialogue_text,
             )
             if not composed.text and em.will_speak and not ask_mode:
                 plan = self.speech.utter_with_plan()

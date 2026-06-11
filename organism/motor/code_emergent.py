@@ -59,7 +59,7 @@ class EmergentCodeMotor:
         for trig, code in self._learned_snippets.items():
             if trig in key or key in trig:
                 return code
-        weights = sorted(self._weights.items(), key=lambda x: -x[1])
+        weights = sorted(self.tokens._weights.items(), key=lambda x: -x[1])
         top = [t for t, _ in weights[:40]]
         if len(top) < 4:
             return ""

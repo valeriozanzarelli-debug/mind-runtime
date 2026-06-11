@@ -31,6 +31,7 @@ const cam = document.getElementById("cam");
 const frameCanvas = document.getElementById("frame-canvas");
 const btnHand = document.getElementById("btn-hand");
 const btnMic = document.getElementById("btn-mic");
+const btnTrain = document.getElementById("btn-train");
 
 function handBtn(fn) {
   if (btnHand) fn(btnHand);
@@ -308,17 +309,28 @@ function renderConsciousnessStream(lines) {
 
 async function sendChat(text) {
   const phrase = (text || chatInput?.value || "").trim();
-  if (!phrase || !born || chatBusy) return;
+  if (!phrase || chatBusy) return;
+  if (!born) {
+    setStatus("baby non ancora nato — attendi...");
+    return;
+  }
   chatBusy = true;
   chatSend?.setAttribute("disabled", "true");
   appendDialogueBubble("tu", phrase);
   if (chatInput) chatInput.value = "";
   try {
     const r = await api("/api/baby/chat", { text: phrase });
-    if (r.reply) {
-      appendDialogueBubble("organism", r.reply);
-      if (speechLine) speechLine.textContent = r.reply;
-      speak(r.reply);
+    if (r.error) {
+      console.warn("chat error from server:", r.error);
+      appendDialogueBubble("organism", "...");
+    } else {
+      if (r.reply) {
+        appendDialogueBubble("organism", r.reply);
+        if (speechLine) speechLine.textContent = r.reply;
+        speak(r.reply);
+      } else if (!r.ok) {
+        appendDialogueBubble("organism", "...");
+      }
     }
     if (r.dialogue?.length) renderDialogue(r.dialogue);
     if (r.consciousness?.events?.length) {
@@ -329,7 +341,7 @@ async function sendChat(text) {
     refreshState();
   } catch (err) {
     console.error("sendChat", err);
-    setStatus("errore invio — riprova");
+    setStatus("errore rete — riprova");
   } finally {
     chatBusy = false;
     chatSend?.removeAttribute("disabled");
@@ -699,6 +711,28 @@ if (chatForm) {
     e.preventDefault();
     unlockVoice();
     sendChat();
+  });
+}
+
+if (btnTrain) {
+  btnTrain.addEventListener("click", async () => {
+    if (!born) { setStatus("baby non ancora nato"); return; }
+    btnTrain.disabled = true;
+    setStatus("training fondazionale in corso (~ 3 s)...");
+    try {
+      const r = await api("/api/baby/train-foundation", { repeats: 1 });
+      if (r.error) {
+        setStatus("errore training: " + r.error);
+      } else {
+        setStatus(`training ok — ${r.vocab || 0} parole, ${r.dialogue_pairs || 0} dialoghi`);
+        refreshState();
+      }
+    } catch (err) {
+      console.error("train-foundation", err);
+      setStatus("errore training — riprova");
+    } finally {
+      btnTrain.disabled = false;
+    }
   });
 }
 
