@@ -1,0 +1,45 @@
+[project]
+name = "mind-runtime"
+version = "0.5.0"
+description = "MIND + ORGANISM — cognitive runtime with DNA-grown neural topology, sensory input, motor output"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "InkConscious" }]
+keywords = ["cognitive-architecture", "ai-agent", "neuromorphic", "organism", "memory", "reasoning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+sensory = ["numpy>=1.24"]
+full = ["pytest>=8.0", "numpy>=1.24", "pillow>=10.0"]
+
+[project.urls]
+Homepage = "https://github.com/valeriozanzarelli-debug/mind-runtime"
+Repository = "https://github.com/valeriozanzarelli-debug/mind-runtime"
+Issues = "https://github.com/valeriozanzarelli-debug/mind-runtime/issues"
+
+[project.scripts]
+mind = "mind.cli:main"
+organism = "organism.cli:main"
+nursery = "organism.nursery.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mind*", "organism*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

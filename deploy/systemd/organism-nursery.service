@@ -1,0 +1,27 @@
+[Unit]
+Description=ORGANISM Baby nursery (mind-runtime)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mind-runtime
+Environment=PYTHONUNBUFFERED=1
+Environment=ORGANISM_BASE_PATH=/organism
+Environment=ORGANISM_BIND=127.0.0.1
+Environment=ORGANISM_PORT=8765
+Environment=ORGANISM_BABY_STATE=/opt/mind-runtime/data/baby_state.json
+Environment=ORGANISM_DNA_VARIANT=genesis
+Environment=ORGANISM_PULSE_INTERVAL=1.2
+Environment=ORGANISM_MAX_NEURONS=35000
+Environment=ORGANISM_GROWTH_BATCH=120
+Environment=ORGANISM_GROWTH_EVERY=20
+Environment=ORGANISM_ALLOW_REBIRTH=0
+ExecStart=/opt/mind-runtime/.venv/bin/python -m organism.nursery.server --host 127.0.0.1 --port 8765 --base-path /organism
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

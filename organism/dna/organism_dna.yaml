@@ -1,0 +1,103 @@
+genome_version: "0.1.0"
+species: InkConsciousAgent
+
+scale:
+  # MVP test profile — full prod scales via multiplier
+  neuron_multiplier: 1.0
+  connection_multiplier: 1.0
+
+neuron_types:
+  sensory:
+    - vision_edge_detector
+    - audio_frequency_analyzer
+    - text_semantic_encoder
+  associative:
+    - pattern_matcher
+    - memory_consolidator
+    - emotion_modulator
+  motor:
+    - speech_phoneme_generator
+    - song_melody_composer
+    - text_syntax_formatter
+    - motion_gesture_emitter
+
+neuron_counts:
+  vision_edge_detector: 256
+  audio_frequency_analyzer: 64
+  text_semantic_encoder: 128
+  pattern_matcher: 200
+  memory_consolidator: 150
+  emotion_modulator: 80
+  speech_phoneme_generator: 100
+  song_melody_composer: 60
+  text_syntax_formatter: 80
+  motion_gesture_emitter: 40
+
+growth_rules:
+  sensory_to_associative:
+    source_layer: sensory
+    target_layer: associative
+    connections_per_neuron: 40
+    weight_init: xavier_uniform
+    pruning_threshold: 0.08
+
+  pattern_to_memory:
+    source_layer: associative
+    source_subtype: pattern_matcher
+    target_layer: associative
+    target_subtype: memory_consolidator
+    connections_per_neuron: 25
+    reinforcement: hebbian
+
+  memory_to_motor:
+    source_layer: associative
+    target_layer: motor
+    connections_per_neuron: 30
+    gating: emotion_modulated
+
+  associative_to_associative:
+    source_layer: associative
+    target_layer: associative
+    connections_per_neuron: 15
+    weight_init: small_random
+
+fractal_expansion:
+  enabled: true
+  type: recursive_branching
+  depth: 3
+  branching_factor: 3
+  template_subtype: pattern_matcher
+  layer: associative
+  neurons_per_leaf: 12
+
+plasticity:
+  hebbian_learning:
+    rate: 0.01
+    decay: 0.001
+  spike_timing_dependent:
+    window_ms: 20
+    potentiation: 0.05
+    depression: 0.02
+  homeostatic:
+    target_firing_rate: 5.0
+    adjustment_rate: 0.001
+
+pruning:
+  schedule: "0 3 * * *"
+  weak_synapse_threshold: 0.04
+  keep_percentage: 0.92
+  protect_weight: 0.12
+
+live_learning:
+  enabled: true
+  fragment_weight_boost: 0.04
+  fragment_weight_penalty: 0.02
+  pathway_boost: 0.03
+  episode_compress_every: 5
+  auto_save_every: 0  # 0 = disabled; N = save state every N cycles
+
+pattern_lexicon:
+  bulb_malfunction: ["lampadina", "luce", "spenta", "non si accende", "bulb"]
+  circle_inside: ["cerchio", "circle", "quadrato", "triangolo", "rettangolo"]
+  booking_intent: ["prenot", "appuntamento", "gioved", "orario"]
+  social_distrust: ["diffidente", "marzo", "cliente"]

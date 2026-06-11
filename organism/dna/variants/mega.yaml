@@ -1,0 +1,43 @@
+# Profilo mega — ~1M neuroni, connettività sparsa, basso consumo per tick
+genome_version: "0.1.0-mega"
+species: OrganismMega
+
+scale:
+  neuron_multiplier: 1200
+  connection_multiplier: 1.0
+  sparse_fan_out_cap: 7
+  energy_budget_per_tick: 400000
+
+fractal_expansion:
+  enabled: true
+  depth: 3
+  branching_factor: 3
+  neurons_per_leaf: 6
+
+growth_rules:
+  sensory_to_associative:
+    connections_per_neuron: 8
+    pruning_threshold: 0.1
+
+  pattern_to_memory:
+    connections_per_neuron: 6
+
+  memory_to_motor:
+    connections_per_neuron: 8
+
+  associative_to_associative:
+    connections_per_neuron: 4
+    weight_init: small_random
+
+plasticity:
+  hebbian_learning:
+    rate: 0.008
+    decay: 0.0008
+  homeostatic:
+    target_firing_rate: 3.0
+    adjustment_rate: 0.0008
+
+pattern_lexicon: {}
+
+baby:
+  locale: it-IT

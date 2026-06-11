@@ -1,0 +1,31 @@
+# Profilo adolescent — ~4–5k neuroni, ~120k sinapsi, ~120 MB RAM
+# Step intermedio tra baby e compact — più capacità senza OOM su VPS 8GB
+genome_version: "0.1.0-adolescent"
+species: OrganismAdolescent
+
+scale:
+  neuron_multiplier: 3.2
+  connection_multiplier: 0.55
+  sparse_fan_out_cap: 18
+  energy_budget_per_tick: 18000
+
+fractal_expansion:
+  enabled: true
+  depth: 2
+  branching_factor: 3
+  neurons_per_leaf: 8
+
+growth_rules:
+  sensory_to_associative:
+    connections_per_neuron: 22
+  pattern_to_memory:
+    connections_per_neuron: 16
+  memory_to_motor:
+    connections_per_neuron: 18
+  associative_to_associative:
+    connections_per_neuron: 10
+
+pattern_lexicon: {}
+
+baby:
+  locale: it-IT

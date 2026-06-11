@@ -1,0 +1,67 @@
+"""Discorso maturo — frasi lunghe e coerenti, non balbettio."""
+
+from __future__ import annotations
+
+import random
+from typing import Any
+
+
+_OPENERS = (
+    "vedo", "noto", "riconosco", "penso", "credo", "sento", "capisco",
+    "osservo", "ricordo", "so",
+)
+_LINKS = ("e", "anche", "poi", "quindi", "perché", "mentre", "quando", "come")
+_CLOSERS = (
+    "è interessante", "mi colpisce", "lo imparo", "ha senso",
+    "mi piace capire", "continuo ad imparare",
+)
+
+
+def compose_discourse(
+    themes: list[str],
+    *,
+    rng: random.Random | None = None,
+    min_words: int = 8,
+    max_words: int = 18,
+    heard: str = "",
+) -> str:
+    """Assembla un periodo umano da temi lessicali."""
+    r = rng or random.Random()
+    words = [w.lower().strip() for w in themes if w and len(w) > 2 and w.isalpha()]
+    if not words:
+        return ""
+    words = list(dict.fromkeys(words))[:10]
+    if heard:
+        hw = [w for w in heard.lower().split() if len(w) > 2]
+        words = list(dict.fromkeys(hw[:2] + words))
+
+    opener = r.choice(_OPENERS)
+    parts: list[str] = [opener]
+    target = min(max_words, max(min_words, len(words) + 4))
+    i = 0
+    while len(parts) < target and i < len(words) * 2:
+        w = words[i % len(words)]
+        if len(parts) >= 2 and r.random() < 0.35:
+            parts.append(r.choice(_LINKS))
+        parts.append(w)
+        i += 1
+    if len(parts) < min_words and words:
+        parts.extend(r.sample(_CLOSERS, k=1))
+    text = " ".join(parts[:max_words]).strip()
+    if not text:
+        return ""
+    if text[-1] not in ".?!":
+        text += "."
+    return text[0].upper() + text[1:]
+
+
+def is_babble(text: str, *, min_words: int = 5) -> bool:
+    t = text.strip().lower().rstrip(".?!")
+    words = [w for w in t.split() if w]
+    if len(words) < min_words:
+        return True
+    if len(set(words)) == 1:
+        return True
+    if len(t) < 12:
+        return True
+    return False

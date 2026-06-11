@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#050608" />
+  <title>ORGANISM</title>
+  <script>window.ORGANISM_BASE = "__ORGANISM_BASE__";</script>
+  <link rel="stylesheet" href="__ORGANISM_BASE__/static/baby.css" />
+</head>
+<body>
+  <div class="cam-layer" aria-hidden="true">
+    <video id="cam" autoplay playsinline muted></video>
+    <canvas id="frame-canvas" width="64" height="64" hidden></canvas>
+  </div>
+  <div class="cam-vignette" aria-hidden="true"></div>
+
+  <main class="overlay">
+    <div class="synapse-counter" aria-live="polite">
+      <span id="syn-count" class="syn-count">—</span>
+      <span class="syn-label">sinapsi</span>
+      <span id="syn-grown" class="syn-grown"></span>
+    </div>
+
+    <div id="orb" class="orb sleeping" aria-label="organismo"></div>
+
+    <div class="brain-meters compact-meters">
+      <div class="meter-row">
+        <span>motorio</span>
+        <div class="meter"><div id="motor-bar" class="meter-fill motor"></div></div>
+      </div>
+      <div class="meter-row">
+        <span>inibizione</span>
+        <div class="meter"><div id="inhib-bar" class="meter-fill inhib"></div></div>
+      </div>
+      <div class="meter-row">
+        <span>coscienza</span>
+        <div class="meter"><div id="conscious-bar" class="meter-fill conscious"></div></div>
+      </div>
+    </div>
+
+    <p id="voice-hint" class="voice-hint">tocca lo schermo per sentire la voce</p>
+    <p id="thought-line" class="thought-line" hidden></p>
+    <p id="status" class="status">sta caricando…</p>
+
+    <section class="dialogue-panel" aria-label="dialogo">
+      <div class="panel-head">Dialogo</div>
+      <div id="dialogue-log" class="dialogue-log"></div>
+    </section>
+
+    <details class="consciousness-panel">
+      <summary class="consciousness-title">mente interna</summary>
+      <div id="consciousness-stream" class="consciousness-stream"></div>
+    </details>
+  </main>
+
+  <form id="chat-form" class="chat-bar" autocomplete="off">
+    <input id="chat-input" class="chat-input" type="text" enterkeyhint="send" placeholder="Scrivi a lui…" maxlength="280" />
+    <button id="chat-send" class="chat-send" type="submit" aria-label="Invia">↑</button>
+  </form>
+
+  <div class="controls controls-mic">
+    <button id="btn-mic" class="hand-btn mic-btn mic-only" title="Tieni premuto per parlare">
+      <span class="hand-icon">🎤</span>
+      <span class="hand-label">parla</span>
+    </button>
+    <a href="__ORGANISM_BASE__/lab" class="small link lab-link">lab</a>
+  </div>
+
+  <script src="__ORGANISM_BASE__/static/baby.js"></script>
+</body>
+</html>

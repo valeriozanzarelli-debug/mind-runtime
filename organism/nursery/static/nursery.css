@@ -1,0 +1,151 @@
+:root {
+  --bg: #0a0e14;
+  --panel: #121820;
+  --border: #1e2a38;
+  --text: #e6edf3;
+  --muted: #7d8b9a;
+  --sensory: #58a6ff;
+  --associative: #3fb950;
+  --motor: #f778ba;
+  --accent: #d2a8ff;
+  --warn: #d29922;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #141c28 0%, var(--bg) 100%);
+}
+header h1 { margin: 0; font-size: 1.4rem; color: var(--accent); }
+.tagline { margin: 0.25rem 0 0.75rem; color: var(--muted); font-size: 0.85rem; }
+
+#status-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+.badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  background: var(--border);
+  font-size: 0.75rem;
+}
+.badge.on { background: #1a3d2a; color: var(--associative); }
+.badge.off { background: #3d1a1a; color: #f85149; }
+#stats-line { color: var(--muted); font-size: 0.8rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 1rem;
+  padding: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.panel h2 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--accent); }
+.panel h2 small { color: var(--muted); font-weight: normal; }
+.panel h3 { margin: 1rem 0 0.5rem; font-size: 0.8rem; color: var(--muted); }
+
+.controls { grid-row: span 2; }
+.graph-panel { min-height: 420px; }
+#brain-graph {
+  height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #080c10;
+}
+
+#graph-legend { margin-bottom: 0.5rem; font-size: 0.75rem; }
+.leg { margin-right: 1rem; }
+.leg.sensory { color: var(--sensory); }
+.leg.associative { color: var(--associative); }
+.leg.motor { color: var(--motor); }
+#graph-meta { margin-top: 0.5rem; color: var(--muted); font-size: 0.75rem; }
+
+.thoughts { grid-column: 1 / -1; max-height: 280px; overflow: hidden; display: flex; flex-direction: column; }
+#growth-chart { width: 100%; max-width: 100%; background: #080c10; border-radius: 6px; }
+.growth { grid-column: 1 / -1; }
+
+#thought-stream {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+  background: #080c10;
+  border-radius: 6px;
+  max-height: 220px;
+}
+.thought-line { padding: 0.15rem 0; border-bottom: 1px solid #1a2030; }
+.thought-line.stim { color: var(--warn); }
+.thought-line.sym { color: var(--muted); padding-left: 1rem; }
+.thought-line.act { color: var(--associative); }
+.thought-line.say { color: var(--sensory); }
+.thought-line.new { color: var(--motor); font-weight: bold; }
+
+.btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+button {
+  background: var(--border);
+  color: var(--text);
+  border: 1px solid #2a3848;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+button:hover { background: #2a3848; }
+button.primary { background: #1f3d5c; border-color: var(--sensory); color: var(--sensory); }
+
+.phase-block { margin: 0.5rem 0; padding: 0.5rem; background: #0a1018; border-radius: 4px; }
+.phase-block h4 { margin: 0 0 0.35rem; font-size: 0.8rem; }
+.phase-block p { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.7rem; }
+.lesson-btn { font-size: 0.7rem; padding: 0.25rem 0.5rem; margin: 0.15rem; }
+
+textarea {
+  width: 100%;
+  background: #080c10;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-family: inherit;
+  resize: vertical;
+}
+select {
+  background: #080c10;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.4rem;
+}
+
+#verify-panel { margin-top: 0.75rem; font-size: 0.8rem; }
+.check-ok { color: var(--associative); }
+.check-fail { color: #f85149; }
+
+footer {
+  text-align: center;
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr; }
+  .controls { grid-row: auto; }
+}

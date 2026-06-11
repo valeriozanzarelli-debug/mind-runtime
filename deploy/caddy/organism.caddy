@@ -1,0 +1,24 @@
+# ORGANISM Baby — aggiungi al Caddyfile di inkconscius.eu (o inkconscious.eu)
+#
+# URL pubblico: https://inkconscius.eu/organism/
+# Backend:      127.0.0.1:8765 (systemd organism-nursery.service)
+#
+# Dopo edit:  sudo caddy validate --config /etc/caddy/Caddyfile
+#             sudo systemctl reload caddy
+
+inkconscius.eu {
+	# … blocchi esistenti (inkconscious-bot, /api, ecc.) …
+
+	@organism path /organism /organism/*
+	handle @organism {
+		uri strip_prefix /organism
+		header Permissions-Policy "microphone=*, camera=*"
+		reverse_proxy 127.0.0.1:8765
+	}
+}
+
+# Alternativa sottodominio (senza base path — decommenta se preferisci):
+# organism.inkconscius.eu {
+# 	header Permissions-Policy "microphone=*, camera=*"
+# 	reverse_proxy 127.0.0.1:8765
+# }
