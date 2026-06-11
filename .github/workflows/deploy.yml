@@ -72,6 +72,12 @@ jobs:
             systemctl daemon-reload
             systemctl restart organism-nursery.service
           fi
+          # Permessi directory data — www-data deve poter creare file .tmp per atomic write
+          mkdir -p "${INSTALL_DIR}/data"
+          chown -R www-data:www-data "${INSTALL_DIR}/data"
+          chmod 775 "${INSTALL_DIR}/data"
+          # File stato: crea se non esiste, aggiusta permessi
+          touch "${INSTALL_DIR}/data/baby_state.json" 2>/dev/null || true
           chown www-data:www-data "${INSTALL_DIR}/data/baby_state.json" 2>/dev/null || true
           chmod 664 "${INSTALL_DIR}/data/baby_state.json" 2>/dev/null || true
           systemctl is-active organism-nursery.service
