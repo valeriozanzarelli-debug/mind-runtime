@@ -40,10 +40,12 @@ jobs:
             printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
             chmod 600 "$KEY_FILE"
           fi
-          SSH=(ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i "$KEY_FILE" -o IdentitiesOnly=yes)
+          SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o BatchMode=yes -i "$KEY_FILE" -o IdentitiesOnly=yes)
+          SSH=(ssh "${SSH_OPTS[@]}")
+          RSYNC_RSH="ssh ${SSH_OPTS[*]}"
 
           echo "=== rsync to /opt/mind-runtime ==="
-          rsync -az --delete \
+          rsync -az --delete -e "$RSYNC_RSH" \
             --exclude '.git' --exclude '.pytest_cache' --exclude '__pycache__' \
             --exclude '*.egg-info' --exclude '.venv' \
             --exclude 'data/baby_state.json' --exclude 'data/*.tmp' \
