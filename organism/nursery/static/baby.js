@@ -322,14 +322,13 @@ async function sendChat(text) {
     const r = await api("/api/baby/chat", { text: phrase });
     if (r.error) {
       console.warn("chat error from server:", r.error);
-      appendDialogueBubble("organism", "...");
     } else {
-      if (r.reply) {
-        appendDialogueBubble("organism", r.reply);
-        if (speechLine) speechLine.textContent = r.reply;
-        speak(r.reply);
-      } else if (!r.ok) {
-        appendDialogueBubble("organism", "...");
+      // Fonte di verità unica: moment.spoke (o reply come fallback)
+      // Il dialogo mostra ESATTAMENTE quello che Baby dice ad alta voce
+      const spoken = r.moment?.spoke || r.reply || "";
+      if (spoken) {
+        appendDialogueBubble("organism", spoken);
+        if (speechLine) speechLine.textContent = spoken;
       }
     }
     if (r.dialogue?.length) renderDialogue(r.dialogue);
@@ -337,6 +336,8 @@ async function sendChat(text) {
       appendMindEvents(r.consciousness.events);
       consciousnessSeq = Math.max(consciousnessSeq, r.consciousness.seq || 0);
     }
+    // applyMoment gestisce TTS (via speak(moment.spoke)) + stato cervello
+    // NON chiamiamo speak() qui — evita doppio parlato
     if (r.moment) applyMoment(r.moment);
     refreshState();
   } catch (err) {
@@ -589,6 +590,12 @@ async function onHeard(phrase, source = "caregiver") {
         : `${p.object || r.name} · ${r.trials ?? 1}/3`;
       if (r.consolidated) speak(r.parsed?.phrase || `vedo ${p.object}`);
     } else if (r.moment) {
+      // Mostra nel dialogo quello che Baby dice — fonte unica = moment.spoke
+      const spoken = r.moment.spoke || "";
+      if (spoken) {
+        appendDialogueBubble("tu", phrase);
+        appendDialogueBubble("organism", spoken);
+      }
       applyMoment(r.moment);
     }
     await refreshState();
