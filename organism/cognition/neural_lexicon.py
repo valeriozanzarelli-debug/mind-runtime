@@ -53,7 +53,8 @@ class NeuralLexicon:
             neuron = self._brain.neurons.get(nid)
             if not neuron:
                 continue
-            act = neuron.activation + self._exposure.get(w, 0.0) * 0.08
+            # Contesto corrente (neurone) domina; esposizione è bias secondario.
+            act = neuron.activation + self._exposure.get(w, 0.0) * 0.02
             if act >= min_act:
                 scored.append((act, w))
         scored.sort(key=lambda x: (-x[0], x[1]))

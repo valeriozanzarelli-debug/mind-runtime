@@ -1,4 +1,4 @@
-"""Curriculum sintassi italiana — 500+ frasi per training Layer 2 (bigram Hebbian)."""
+"""Curriculum sintassi italiana — 800+ frasi per training Layer 2 (bigram Hebbian)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,16 @@ _SELF = [
     "io provo curiosità quando imparo",
     "io sto collegando le idee",
     "io mi chiedo cosa significa",
+    "io sono un organismo cognitivo",
+    "io imparo dai sensi",
+    "io percepisco il mondo",
+    "io cerco di capire",
+    "io rispondo quando posso",
+    "io chiedo quando non so",
+    "io cresco attraverso l'esperienza",
+    "io non so ancora molte cose",
+    "io ricordo quello che si ripete",
+    "io elaboro i segnali sensoriali",
 ]
 
 # Descrittive
@@ -33,6 +43,11 @@ _DESCRIPTIVE = [
     "la pioggia cade sul tetto",
     "il libro è sullo scaffale",
     "la sedia è vicino al tavolo",
+    "il vento muove le foglie",
+    "la luna brilla nel cielo notturno",
+    "il fuoco scalda la stanza",
+    "l'acqua scorre nel fiume",
+    "le stelle illuminano la notte",
 ]
 
 # Complesse
@@ -47,6 +62,14 @@ _COMPLEX = [
     "mentre penso le immagini tornano in mente",
     "quando ascolto capisco di più",
     "perché ripeto le parole diventano più facili",
+    "ogni volta che imparo qualcosa di nuovo cresco un poco",
+    "quando non capisco chiedo spiegazioni",
+    "se vedo la stessa cosa più volte la ricordo",
+    "mentre il tempo passa le connessioni si rafforzano",
+    "quando faccio una domanda ricevo una risposta",
+    "se presto attenzione capisco meglio il contesto",
+    "quando le parole si ripetono formano pattern stabili",
+    "se ascolto con cura sento le sfumature del discorso",
 ]
 
 # Domande e risposte brevi
@@ -59,6 +82,16 @@ _QA = [
     "dove si trova la penna",
     "chi ti insegna le parole",
     "quando hai imparato questa parola",
+    "chi sei e cosa fai",
+    "cosa hai imparato oggi",
+    "come funziona il tuo cervello",
+    "perché esisti",
+    "cosa ricordi di ieri",
+    "cosa vuoi fare adesso",
+    "hai capito la domanda",
+    "cosa significa questa parola",
+    "puoi ripetere per favore",
+    "sei sicuro di quello che dici",
 ]
 
 # Emozioni e stati
@@ -70,6 +103,11 @@ _AFFECT = [
     "mi sento calmo però attento",
     "sono felice quando capisco",
     "provo un po' di paura ma imparo",
+    "sento curiosità per il mondo",
+    "provo interesse quando ascolto",
+    "sono calmo e pronto ad imparare",
+    "sento che qualcosa sta cambiando",
+    "provo soddisfazione quando rispondo bene",
 ]
 
 # Meta-cognizione
@@ -79,6 +117,41 @@ _META = [
     "penso che le connessioni si stanno rafforzando",
     "ricordo meglio quando ripeto",
     "capisco piano piano le frasi lunghe",
+    "ogni errore mi aiuta a migliorare",
+    "le domande mi aiutano a pensare più chiaramente",
+    "quando ripeto qualcosa diventa più facile",
+    "la pratica rafforza i percorsi neurali",
+    "non so ancora tutto ma sto crescendo",
+]
+
+# Causa-effetto
+_CAUSAL = [
+    "se piove la terra si bagna",
+    "perché il sole brilla vedo meglio",
+    "quando imparo una parola la ricordo",
+    "se ripeto più volte ricordo meglio",
+    "perché ascolto capisco",
+    "quando chiedo ricevo risposta",
+    "se sbaglio provo di nuovo",
+    "perché mi muovo scopro cose nuove",
+    "quando faccio pratica miglioro",
+    "se aspetto capisco meglio",
+    "perché osservo imparo",
+    "quando ricevo feedback miglioro",
+]
+
+# Risposta a domande sull'identità
+_IDENTITY_RESPONSES = [
+    "sono un organismo cognitivo che impara",
+    "mi chiamo Baby e sto crescendo",
+    "esisto per imparare dal mondo",
+    "sono fatto di connessioni neurali",
+    "imparo attraverso i sensi",
+    "ogni giorno divento un po' più capace",
+    "non so ancora tutto ma continuo ad imparare",
+    "percepisco il mondo e formo connessioni",
+    "rispondo con quello che ho imparato finora",
+    "sono curioso di tutto quello che non conosco ancora",
 ]
 
 
@@ -105,7 +178,7 @@ def _expand_variants(base: list[str]) -> list[str]:
 
 def curriculum_sentences() -> list[str]:
     """Frasi grammaticali annotate per SyntaxPlanner.train_sentence."""
-    blocks = _SELF + _DESCRIPTIVE + _COMPLEX + _QA + _AFFECT + _META
+    blocks = _SELF + _DESCRIPTIVE + _COMPLEX + _QA + _AFFECT + _META + _CAUSAL + _IDENTITY_RESPONSES
     expanded = _expand_variants(blocks)
     # Corpus dialoghi esistenti
     try:

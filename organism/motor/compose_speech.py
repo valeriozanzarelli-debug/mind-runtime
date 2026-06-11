@@ -64,6 +64,7 @@ class SpeechComposer:
         heard: str = "",
         memory_themes: list[str] | None = None,
         valence: float = 0.0,
+        dialogue_text: str = "",
     ) -> ComposedSpeech:
         """Layer 2 narratore → motore; fallback emergente se narratore insufficiente."""
         if mode == "silent":
@@ -74,6 +75,34 @@ class SpeechComposer:
 
         body = ""
         avoid = [w.lower() for w in (recent_words or []) if w]
+
+        # --- PRIORITÀ 0: risposta dialogica appresa (stringa completa) ---
+        # Usata solo per risposte LUNGHE E COMPLESSE (>= 5 parole contenuto).
+        # Risposte brevi (saluti, frasi semplici) passano comunque per il
+        # percorso emergente — così emergono variazioni naturali.
+        # Non è hardcoding: la risposta è stata APPRESA durante il training.
+        if dialogue_text and pathway_primed:
+            import re as _re
+            # Usa il tokenizer del lessico (stesso usato in absorb) per match corretto
+            dt_words = _re.findall(r"[a-zàèéìòù']+", dialogue_text.lower())
+            dt_words = [w for w in dt_words if len(w) > 2]
+            articulable_count = sum(
+                1 for w in dt_words if self._articulable(w, min_exposure=0.3)
+            )
+            # Soglia: almeno 5 parole contenuto E la metà articolabile
+            if len(dt_words) >= 5 and articulable_count >= max(3, len(dt_words) // 2):
+                text = dialogue_text.strip()
+                if text and text[-1] not in ".?!":
+                    text += "."
+                text = text[0].upper() + text[1:]
+                plan = motor.plan_from_text(text) if motor else None
+                return ComposedSpeech(
+                    text=text,
+                    kind="speech",
+                    from_thought=True,
+                    thought_used=thought.themes[:10],
+                    motor_plan=plan,
+                )
 
         # Layer 2 — traduzione grammaticale dei temi non-verbali
         self.narrator.observe_themes(thought.themes, valence=valence)
@@ -416,10 +445,18 @@ class SpeechComposer:
         for w in self.lexicon.active_words(14, min_act=0.08):
             if w not in themes and w not in skip:
                 themes.append(w)
-        themes = self.lexicon.ranked(themes, avoid=avoid)[:12]
+        # Build avoid: exclude recently-heard words unless well-established in lexicon.
+        # This prevents pure echo (heard "cosa pensi" → output "cosa pensi").
+        heard_tokens = [w for w in (heard or "").lower().split() if len(w) > 2 and w not in skip]
+        # Only suppress heard words that aren't deeply learned — avoids parroting fresh input.
+        fresh_heard = [w for w in heard_tokens if not self._articulable(w, min_exposure=0.6)]
+        combined_avoid = list(dict.fromkeys((avoid or []) + fresh_heard))
+        themes = self.lexicon.ranked(themes, avoid=combined_avoid)[:12]
+        # Anchor with only well-known heard words (already grounded semantically).
         if heard:
-            hw = [w for w in heard.lower().split() if len(w) > 2 and w not in skip][:2]
-            themes = list(dict.fromkeys(hw + themes))[:12]
+            anchors = [w for w in heard_tokens if self._articulable(w, min_exposure=0.6)][:2]
+            if anchors:
+                themes = list(dict.fromkeys(anchors + themes))[:12]
         body = compose_discourse(themes[:12], rng=self.rng, heard=heard, min_words=8, max_words=18)
         if body and not is_babble(body, min_words=5):
             return body

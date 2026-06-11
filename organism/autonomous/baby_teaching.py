@@ -650,3 +650,94 @@ class BabyTeachingMixin:
         self._researched = True
         self._persist()
         return {"researched": True, "topics": topics}
+
+    def train_foundation(self, *, repeats: int = 1) -> dict[str, Any]:
+        """Training fondazionale — vocabolario, dialoghi, testo contestuale.
+
+        Chiamare esplicitamente dopo birth() per dare a Baby una base linguistica reale.
+        Non hardcoda risposte: le associazioni emergono dalla co-attivazione neurale
+        mentre Baby assorbe testo italiano reale (Esopo, ragionamento, identità, mondo).
+
+        Args:
+            repeats: quante volte ripetere il ciclo completo (default 1, usa 2-3 per training profondo).
+        """
+        from organism.teaching.corpus import (
+            HIGH_FREQ_BLOCKS,
+            REASONING,
+            IDENTITY,
+            PHILOSOPHY,
+            CONVERSATION,
+            WORLD_KNOWLEDGE,
+            CODE_DIALOGUES,
+            STORIES_EXTENDED,
+            all_training_text,
+        )
+        from organism.teaching.syntax_curriculum import curriculum_sentences
+
+        org = self._ensure()
+        stats: dict[str, Any] = {"cycles": repeats, "steps": []}
+
+        for cycle in range(repeats):
+            step: dict[str, Any] = {"cycle": cycle + 1}
+
+            # 1. Vocabolario ad alta frequenza — fondazione fonologica + lessicale
+            for block in HIGH_FREQ_BLOCKS:
+                self.absorb_vocabulary(block, boost=2.0 if cycle == 0 else 1.2)
+            step["vocab_blocks"] = len(HIGH_FREQ_BLOCKS)
+
+            # 2. Curriculum sintattico — bigrammi SVO, 800+ frasi
+            syntax_stats = self.narrator.bootstrap_curriculum(repeats=3 + cycle)
+            step["syntax"] = syntax_stats
+
+            # 3. Associazioni dialogiche — percorsi neurali Q→A, non risposte fisse.
+            #    Ripetute consolidate_at volte per raggiungere la soglia di consolidamento.
+            consolidate_at = self.dialogue.consolidate_at
+            all_pairs = REASONING + IDENTITY + PHILOSOPHY + CONVERSATION + WORLD_KNOWLEDGE
+            for when, say in all_pairs:
+                for _ in range(consolidate_at):
+                    self.dialogue.teach(when.strip(), say.strip())
+            for when, say, kind in CODE_DIALOGUES:
+                if kind == "speech":
+                    for _ in range(consolidate_at):
+                        self.dialogue.teach(when.strip(), say.strip())
+            step["dialogue_pairs"] = len(self.dialogue.all_pairs())
+
+            # 4. Testo libero — co-attivazione semantica senza Q→A
+            for text in all_training_text():
+                self.composer.absorb(text, boost=0.4)
+                if self.speech and len(text.split()) >= 5:
+                    self.speech.hear(text[:120], boost=0.12)
+
+            # 5. Frasi curriculum sintassi — rafforza transizioni grammaticali
+            sents = curriculum_sentences()
+            limit = min(400, len(sents))
+            for sent in sents[:limit]:
+                self.composer.absorb(sent, boost=0.25)
+            step["syntax_sentences"] = limit
+
+            # 6. Storie — contesto narrativo continuo
+            for _, say in STORIES_EXTENDED[:4]:
+                self.composer.absorb(say, boost=0.3)
+
+            # 7. Propagazione e Hebbian dopo ogni ciclo
+            org.brain.propagate(steps=2)
+            if org.brain.plasticity:
+                org.brain.plasticity.apply_hebbian(org.brain, org.brain.tick)
+
+            # 8. Normalizza esposizione: evita che parole frequenti nel corpus
+            #    dominino ogni risposta (attivazione neurale deve prevalere sull'esposizione)
+            self.composer.lexicon.squash_overexposed()
+
+            step["vocab_after"] = self.composer.lexicon.count
+            stats["steps"].append(step)
+
+        self._persist()
+        return {
+            "ok": True,
+            "vocab": self.composer.lexicon.count,
+            "dialogue_pairs": len(self.dialogue.all_pairs()),
+            "syllables": self.speech.phonemes.count if self.speech else 0,
+            "narrator": self.narrator.stats(),
+            "cycles": repeats,
+            "detail": stats,
+        }

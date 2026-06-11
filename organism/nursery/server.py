@@ -416,6 +416,15 @@ def _make_handler(server: NurseryServer):
                         )
                     ),
                 )
+            if path == "/api/baby/train-foundation":
+                return _json(
+                    self,
+                    server._with_lock(
+                        lambda: server.baby.train_foundation(
+                            repeats=int(body.get("repeats", 1)),
+                        )
+                    ),
+                )
             if path == "/api/baby/fluency-benchmark":
                 return _json(
                     self,
