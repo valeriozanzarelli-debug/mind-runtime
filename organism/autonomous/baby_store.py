@@ -70,6 +70,7 @@ class BabyStore:
             "version": 1,
             "seed": agent.seed,
             "born": agent._born,
+            "dormant": agent._dormant,
             "researched": agent._researched,
             "synapses_at_birth": agent._synapses_at_birth,
             "last_vision_hash": agent._last_vision_hash,
@@ -192,8 +193,12 @@ class BabyStore:
         agent._dialogue_log = list(payload.get("dialogue_log", []))
 
         agent._born = True
+        agent._dormant = bool(payload.get("dormant", False))
         agent._apply_cognition_config()
-        agent._start_thought_loop()
+        if agent._dormant:
+            agent.thought_generator.stop()
+        else:
+            agent._start_thought_loop()
         agent._researched = bool(payload.get("researched", False))
         agent._synapses_at_birth = int(payload.get("synapses_at_birth", 0))
         if agent.org and agent._synapses_at_birth > agent.org.brain.synapse_count:

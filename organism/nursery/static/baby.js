@@ -1,14 +1,14 @@
 /**
- * Baby UI — telefono: camera sempre attiva, microfono manuale (push-to-talk).
- * Tap ✋ = guarda · Tieni ✋ = nomina · Tieni 🎤 = parla tu.
- * Quando parla lui: ascolta sé stesso e si migliora — non si risponde da solo.
+ * Baby UI — una sola fonte di verità:
+ * - Tu parli/scrivi → trascrizione nel dialogo → risposta solo via TTS (testo = audio)
+ * - Flusso continuo silenzioso (pensa/sogna/percepisce) senza speech casuale
  */
 
 const BASE = (window.ORGANISM_BASE || "").replace(/\/$/, "");
 const VISION_W = 320;
 const VISION_H = 256;
 const HOLD_MS = 380;
-const GLANCE_MS = 10000;
+const FLOW_MS = 2500;
 const HEAR_DEBOUNCE_MS = 2000;
 const SELF_SPEAK_GUARD_MS = 2800;
 
@@ -38,6 +38,7 @@ function handBtn(fn) {
 }
 
 let born = false;
+let dormant = true;
 let mediaStream = null;
 let micRecognition = null;
 let micActive = false;
@@ -48,18 +49,18 @@ let holdTimer = null;
 let isHolding = false;
 let holdStarted = false;
 let teachingFocus = false;
-let glanceBusy = false;
-let hearBusy = false;
-let glanceTimer = null;
+let flowBusy = false;
+let phraseBusy = false;
+let flowTimer = null;
 let voiceUnlocked = false;
-let speakQueue = [];
+let utterQueue = [];
+let utterRunning = false;
 let italianVoice = null;
 let isSelfSpeaking = false;
 let selfSpeakGuardUntil = 0;
 let pendingSelfHear = "";
 let consciousnessSeq = 0;
 const seenMindSeq = new Set();
-let chatBusy = false;
 
 const synth = window.speechSynthesis;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -127,8 +128,7 @@ function unlockVoice() {
     synth.speak(warm);
   } catch (_) { /* iOS */ }
   pickItalianVoice();
-  const queued = speakQueue.splice(0);
-  queued.forEach((t) => doSpeak(t));
+  drainSpeakQueue();
 }
 
 async function reportSelfHear(text) {
@@ -144,13 +144,37 @@ async function reportSelfHear(text) {
   } catch (_) { /* offline */ }
 }
 
-function doSpeak(text) {
-  if (speechLine) speechLine.textContent = text;
+function enqueueSpeak(text) {
+  const t = (text || "").trim();
+  if (!t) return;
+  if (utterQueue[utterQueue.length - 1] === t) return;
+  utterQueue.push(t);
+  drainSpeakQueue();
+}
+
+function drainSpeakQueue() {
+  if (utterRunning || !utterQueue.length) return;
+  if (!voiceUnlocked) return;
+  const text = utterQueue.shift();
+  utterRunning = true;
+  doSpeak(text, () => {
+    utterRunning = false;
+    drainSpeakQueue();
+  });
+}
+
+function doSpeak(text, onDone) {
+  appendDialogueBubble("organism", text);
+  if (speechLine) {
+    speechLine.hidden = false;
+    speechLine.textContent = text;
+  }
   orb.classList.add("speaking");
   orb.classList.remove("wants-voice");
   isSelfSpeaking = true;
   endMicListen();
   pendingSelfHear = text;
+  lastSpoke = text;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = LOCALE;
   u.rate = 0.9;
@@ -158,36 +182,33 @@ function doSpeak(text) {
   u.volume = 1;
   const voice = pickItalianVoice();
   if (voice) u.voice = voice;
-  u.onend = () => {
+  const finish = () => {
     orb.classList.remove("speaking");
     isSelfSpeaking = false;
     selfSpeakGuardUntil = Date.now() + SELF_SPEAK_GUARD_MS;
     const spoke = pendingSelfHear;
     pendingSelfHear = "";
+    if (speechLine) speechLine.hidden = true;
     reportSelfHear(spoke);
     if (!micActive && !isHolding) idleHint();
+    onDone?.();
   };
+  u.onend = finish;
   u.onerror = () => {
-    orb.classList.remove("speaking");
-    isSelfSpeaking = false;
-    selfSpeakGuardUntil = Date.now() + SELF_SPEAK_GUARD_MS;
     pendingSelfHear = "";
+    finish();
   };
-  synth.cancel();
   synth.speak(u);
 }
 
 function speak(text) {
   if (!text) return;
-  if (text === lastSpoke && !isQuestionText(text)) return;
-  lastSpoke = text;
   if (!voiceUnlocked) {
-    if (!speakQueue.includes(text)) speakQueue.push(text);
-    if (speechLine) speechLine.textContent = text;
+    enqueueSpeak(text);
     voiceHint.textContent = "tocca lo schermo per sentire la voce";
     return;
   }
-  doSpeak(text);
+  enqueueSpeak(text);
 }
 
 function idleHint() {
@@ -195,8 +216,10 @@ function idleHint() {
     voiceHint.textContent = "parla ora… rilascia 🎤 quando hai finito";
   } else if (isSelfSpeaking) {
     voiceHint.textContent = "sta parlando…";
+  } else if (dormant) {
+    voiceHint.textContent = "dorme — consolidamento · scrivi o parla per svegliarlo";
   } else {
-    voiceHint.textContent = "✋ guarda/nomina · tieni 🎤 per parlare";
+    voiceHint.textContent = "tieni 🎤 per parlare · scrivi sotto";
   }
 }
 
@@ -210,20 +233,18 @@ function applyBrain(brain, moment) {
   if (consciousBar && moment?.consciousness) {
     consciousBar.style.width = `${Math.min(100, (moment.consciousness.ignition ?? 0) * 100)}%`;
   }
-  orb.classList.remove("wants-voice", "conscious", "afraid", "happy");
+  orb.classList.remove("wants-voice", "conscious", "afraid", "happy", "sleeping");
+  if (dormant) orb.classList.add("sleeping");
   const emo = moment?.emotion;
   const tone = moment?.social_tone;
   if (emo?.dominant === "fear" || tone?.is_angry) orb.classList.add("afraid");
   else if (emo?.dominant === "joy") orb.classList.add("happy");
-  if (moment?.spoke) {
-    /* speaking */
-  } else if (moment?.consciousness?.conscious) {
+  if (moment?.consciousness?.conscious) {
     orb.classList.add("conscious");
-    voiceHint.textContent = `coscienza · ${moment.consciousness.focus || "attivo"}`;
-  } else if (brain.wants_voice || moment?.wanted_to_speak) {
-    orb.classList.add("wants-voice");
-    voiceHint.textContent = "vuole parlare";
-  } else if (!isHolding && !holdStarted && !hearBusy && !micActive) {
+    if (!isSelfSpeaking) {
+      voiceHint.textContent = `coscienza · ${moment.consciousness.focus || "attivo"}`;
+    }
+  } else if (!isHolding && !holdStarted && !phraseBusy && !micActive && !isSelfSpeaking) {
     idleHint();
   }
 }
@@ -307,46 +328,57 @@ function renderConsciousnessStream(lines) {
   appendMindEvents(events);
 }
 
-async function sendChat(text) {
-  const phrase = (text || chatInput?.value || "").trim();
-  if (!phrase || chatBusy) return;
+async function sendPhrase(phrase, source = "caregiver") {
+  const text = (phrase || "").trim();
+  if (!text || phraseBusy) return;
   if (!born) {
     setStatus("baby non ancora nato — attendi...");
     return;
   }
-  chatBusy = true;
+  phraseBusy = true;
   chatSend?.setAttribute("disabled", "true");
-  appendDialogueBubble("tu", phrase);
+  appendDialogueBubble("tu", text);
   if (chatInput) chatInput.value = "";
+  voiceHint.textContent = `sente · «${text.slice(0, 40)}»`;
   try {
-    const r = await api("/api/baby/chat", { text: phrase });
-    if (r.error) {
-      console.warn("chat error from server:", r.error);
-    } else {
-      // Fonte di verità unica: moment.spoke (o reply come fallback)
-      // Il dialogo mostra ESATTAMENTE quello che Baby dice ad alta voce
-      const spoken = r.moment?.spoke || r.reply || "";
-      if (spoken) {
-        appendDialogueBubble("organism", spoken);
-        if (speechLine) speechLine.textContent = spoken;
-      }
+    if (dormant) {
+      try {
+        await api("/api/baby/wake", {});
+        dormant = false;
+        orb.classList.remove("sleeping");
+      } catch (_) { /* */ }
     }
-    if (r.dialogue?.length) renderDialogue(r.dialogue);
-    if (r.consciousness?.events?.length) {
-      appendMindEvents(r.consciousness.events);
-      consciousnessSeq = Math.max(consciousnessSeq, r.consciousness.seq || 0);
-    }
-    // applyMoment gestisce TTS (via speak(moment.spoke)) + stato cervello
-    // NON chiamiamo speak() qui — evita doppio parlato
-    if (r.moment) applyMoment(r.moment);
-    refreshState();
+    const r = await api("/api/baby/hear", visionBody({ phrase: text, source }));
+    handleHearResponse(r);
   } catch (err) {
-    console.error("sendChat", err);
+    console.error("sendPhrase", err);
     setStatus("errore rete — riprova");
   } finally {
-    chatBusy = false;
+    phraseBusy = false;
     chatSend?.removeAttribute("disabled");
   }
+}
+
+function handleHearResponse(r) {
+  if (r.mode === "self_feedback") {
+    voiceHint.textContent = "è la sua voce — si ascolta";
+    if (r.moment) applyMoment(r.moment);
+  } else if (r.mode === "vision_object") {
+    const p = r.parsed || {};
+    voiceHint.textContent = r.consolidated
+      ? `impara · ${p.object || r.name} ✓`
+      : `${p.object || r.name} · ${r.trials ?? 1}/3`;
+    const spoken = r.moment?.spoke || r.parsed?.phrase || "";
+    if (spoken) applyMoment({ ...r.moment, spoke: spoken });
+  } else if (r.moment) {
+    applyMoment(r.moment);
+  }
+  if (r.dialogue?.length) renderDialogue(r.dialogue);
+  refreshState();
+}
+
+async function sendChat(text) {
+  await sendPhrase(text || chatInput?.value || "", "caregiver");
 }
 
 async function pollMind() {
@@ -377,6 +409,22 @@ function applyMoment(moment) {
   if (moment.spoke) speak(moment.spoke);
 }
 
+async function stabilizeBaby() {
+  try {
+    const r = await api("/api/baby/stabilize", { aggressive: true });
+    dormant = true;
+    orb.classList.add("sleeping");
+    const syn = r.synapses_after ?? r.synapses ?? 0;
+    const pruned = r.pruned_synapses ?? 0;
+    setStatus(`sonno · ${Number(syn).toLocaleString("it-IT")} sinapsi (−${pruned})`);
+    idleHint();
+    return r;
+  } catch (err) {
+    console.warn("stabilize", err);
+    return null;
+  }
+}
+
 async function wakeOrBirth() {
   setStatus("sta caricando…");
   try {
@@ -384,10 +432,11 @@ async function wakeOrBirth() {
     const hasLife = ready.born || ready.resumed_from_disk || ready.state_file_exists;
     if (hasLife) {
       born = true;
-      orb.classList.remove("sleeping");
       orb.classList.add("awake");
       setStatus("caricamento memoria…");
       const existing = await api("/api/baby/state?lite=1");
+      dormant = Boolean(existing.dormant ?? true);
+      if (dormant) orb.classList.add("sleeping");
       applyBrain(existing.brain, existing.last_moment);
       if (existing.dialogue?.length) renderDialogue(existing.dialogue);
       try {
@@ -399,11 +448,7 @@ async function wakeOrBirth() {
           appendMindEvents(mind.events);
         }
       } catch (_) { /* */ }
-      const last = existing.last_moment?.spoke;
-      if (last) {
-        if (speechLine) speechLine.textContent = last;
-        if (!speakQueue.includes(last)) speakQueue.push(last);
-      }
+      await stabilizeBaby();
       await refreshState();
       return;
     }
@@ -412,6 +457,7 @@ async function wakeOrBirth() {
     born = true;
     orb.classList.remove("sleeping");
     orb.classList.add("awake");
+    dormant = false;
     await refreshState();
   } catch (err) {
     console.error("wakeOrBirth", err);
@@ -470,11 +516,13 @@ function cameraReady() {
 
 async function refreshState() {
   const s = await api("/api/baby/state?lite=1");
+  dormant = Boolean(s.dormant ?? dormant);
   applyBrain(s.brain, s.last_moment);
   if (s.consciousness_stream?.length) renderConsciousnessStream(s.consciousness_stream);
   const objs = Object.keys(s.visual_binder?.object_names || {}).length;
   const dlg = s.dialogue_count ?? (s.dialogue_pairs || []).length;
-  setStatus(`${dlg} dialoghi · ${objs} oggetti · ${s.syllables_known ?? 0} sillabe`);
+  const mode = dormant ? "sonno" : "veglia";
+  setStatus(`${mode} · ${dlg} dialoghi · ${objs} oggetti · ${s.syllables_known ?? 0} sillabe`);
   if (s.dialogue?.length) renderDialogue(s.dialogue);
 }
 
@@ -514,7 +562,7 @@ function setupMicRecognition() {
     const last = ev.results[ev.results.length - 1];
     if (!last?.isFinal) return;
     const phrase = last[0].transcript.trim();
-    if (phrase) onHeard(phrase, "caregiver");
+    if (phrase) sendPhrase(phrase, "caregiver");
   };
   micRecognition.onend = () => {
     micActive = false;
@@ -560,51 +608,6 @@ function endMicListen() {
   btnMic?.classList.remove("listening");
 }
 
-async function onHeard(phrase, source = "caregiver") {
-  if (!born || hearBusy) return;
-  if (isSelfSpeaking || Date.now() < selfSpeakGuardUntil) return;
-  if (phraseEchoesSelf(phrase)) {
-    await reportSelfHear(phrase);
-    return;
-  }
-  const now = Date.now();
-  if (phrase === lastHeardPhrase && now - lastHeardAt < HEAR_DEBOUNCE_MS) return;
-  lastHeardPhrase = phrase;
-  lastHeardAt = now;
-  hearBusy = true;
-  voiceHint.textContent = `sente · «${phrase.slice(0, 40)}»`;
-  try {
-    const focus = teachingFocus || isTeachingPhrase(phrase);
-    const r = await api("/api/baby/hear", visionBody({
-      phrase,
-      teach_focus: focus,
-      source,
-    }));
-    if (r.mode === "self_feedback") {
-      voiceHint.textContent = "è la sua voce — si ascolta";
-      if (r.moment) applyMoment(r.moment);
-    } else if (r.mode === "vision_object") {
-      const p = r.parsed || {};
-      voiceHint.textContent = r.consolidated
-        ? `impara · ${p.object || r.name} ✓`
-        : `${p.object || r.name} · ${r.trials ?? 1}/3`;
-      if (r.consolidated) speak(r.parsed?.phrase || `vedo ${p.object}`);
-    } else if (r.moment) {
-      // Mostra nel dialogo quello che Baby dice — fonte unica = moment.spoke
-      const spoken = r.moment.spoke || "";
-      if (spoken) {
-        appendDialogueBubble("tu", phrase);
-        appendDialogueBubble("organism", spoken);
-      }
-      applyMoment(r.moment);
-    }
-    await refreshState();
-  } finally {
-    hearBusy = false;
-    if (!isHolding && !holdStarted && !micActive) idleHint();
-  }
-}
-
 async function look() {
   if (!born || !cameraReady()) return;
   voiceHint.textContent = "guarda…";
@@ -613,37 +616,45 @@ async function look() {
   handBtn((b) => b.classList.remove("looking"));
   if (r.recognized) {
     voiceHint.textContent = `riconosce · ${r.recognized} (${Math.round((r.confidence || 0) * 100)}%)`;
-  } else if (r.moment?.spoke) {
-    voiceHint.textContent = "non sa — chiede";
   } else {
-    voiceHint.textContent = "non riconosce ancora";
+    voiceHint.textContent = "osserva in silenzio";
   }
   applyMoment(r.moment);
   refreshState();
 }
 
-async function passiveGlance() {
-  if (!born || !cameraReady() || isHolding || holdStarted || glanceBusy || hearBusy || micActive) return;
-  glanceBusy = true;
+async function continuousFlow() {
+  if (!born || flowBusy || phraseBusy || micActive || isSelfSpeaking) return;
+  flowBusy = true;
   try {
-    const r = await api("/api/baby/glance", visionBody({ min_interval_s: 10 }));
-    if (r.moment?.spoke) {
-      if (r.recognized) {
-        voiceHint.textContent = `vede · ${r.recognized}`;
-      } else {
-        voiceHint.textContent = "scena nuova — chiede";
+    const r = await api("/api/baby/flow", visionBody());
+    dormant = Boolean(r.dormant ?? dormant);
+    if (r.brain || r.moment) applyBrain(r.brain || r.moment?.brain, r.moment);
+    if (r.moment) {
+      const th = r.moment.thought;
+      const dream = r.moment.dream;
+      if (dream?.active && dream.content) {
+        thoughtLine.hidden = false;
+        thoughtLine.textContent = `sogna · ${dream.content.slice(0, 80)}`;
+      } else if (th?.themes?.length) {
+        thoughtLine.hidden = false;
+        thoughtLine.textContent = `pensa · ${th.themes.slice(0, 6).join(" · ")}`;
       }
-      applyMoment(r.moment);
-      refreshState();
     }
-  } finally {
-    glanceBusy = false;
+    if (r.consciousness?.events?.length) {
+      appendMindEvents(r.consciousness.events);
+      consciousnessSeq = Math.max(consciousnessSeq, r.consciousness.seq || 0);
+    }
+    if (r.moment?.spoke) applyMoment(r.moment);
+  } catch (_) { /* offline */ }
+  finally {
+    flowBusy = false;
   }
 }
 
-function startPassiveWatch() {
-  if (glanceTimer) clearInterval(glanceTimer);
-  glanceTimer = setInterval(passiveGlance, GLANCE_MS);
+function startContinuousFlow() {
+  if (flowTimer) clearInterval(flowTimer);
+  flowTimer = setInterval(continuousFlow, FLOW_MS);
 }
 
 function onUserActivate() {
@@ -700,18 +711,18 @@ if (btnHand) {
 }
 
 if (btnMic) {
-btnMic.addEventListener("mousedown", onMicDown);
-btnMic.addEventListener("mouseup", onMicUp);
-btnMic.addEventListener("mouseleave", () => { if (micActive) onMicUp({ preventDefault() {} }); });
-btnMic.addEventListener("touchstart", onMicDown, { passive: false });
-btnMic.addEventListener("touchend", onMicUp, { passive: false });
-btnMic.addEventListener("touchcancel", onMicUp, { passive: false });
+  btnMic.addEventListener("mousedown", onMicDown);
+  btnMic.addEventListener("mouseup", onMicUp);
+  btnMic.addEventListener("mouseleave", () => { if (micActive) onMicUp({ preventDefault() {} }); });
+  btnMic.addEventListener("touchstart", onMicDown, { passive: false });
+  btnMic.addEventListener("touchend", onMicUp, { passive: false });
+  btnMic.addEventListener("touchcancel", onMicUp, { passive: false });
 }
 
 document.body.addEventListener("touchstart", onUserActivate, { passive: true });
 document.body.addEventListener("click", onUserActivate);
 
-setInterval(pollMind, 6000);
+setInterval(pollMind, 4000);
 
 if (chatForm) {
   chatForm.addEventListener("submit", (e) => {
@@ -732,6 +743,7 @@ if (btnTrain) {
         setStatus("errore training: " + r.error);
       } else {
         setStatus(`training ok — ${r.vocab || 0} parole, ${r.dialogue_pairs || 0} dialoghi`);
+        await stabilizeBaby();
         refreshState();
       }
     } catch (err) {
@@ -745,11 +757,11 @@ if (btnTrain) {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    if (glanceTimer) clearInterval(glanceTimer);
+    if (flowTimer) clearInterval(flowTimer);
     endMicListen();
   } else if (born) {
-    startPassiveWatch();
-    setTimeout(passiveGlance, 2500);
+    startContinuousFlow();
+    setTimeout(continuousFlow, 800);
   }
 });
 
@@ -760,8 +772,8 @@ document.addEventListener("visibilitychange", () => {
   idleHint();
   const boot = () => {
     if (!born) return;
-    startPassiveWatch();
-    setTimeout(passiveGlance, 2500);
+    startContinuousFlow();
+    setTimeout(continuousFlow, 800);
   };
   cam.addEventListener("loadeddata", boot, { once: true });
   if (cameraReady()) boot();

@@ -72,6 +72,7 @@ class BabyStateMixin:
             ).to_dict()
         return {
             "born": self._born,
+            "dormant": self._dormant,
             "resumed_from_disk": self._resume_meta is not None,
             "brain": brain_mood,
             "synapses_at_birth": self._synapses_at_birth,

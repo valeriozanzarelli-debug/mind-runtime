@@ -155,6 +155,17 @@ body {
 .meter-fill.inhib { background: #484f58; }
 .meter-fill.conscious { background: linear-gradient(90deg, #1f6feb, #58d0ff); }
 
+.speech-line {
+  margin: 0.35rem 1rem 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.92rem;
+  color: #c9d1d9;
+  background: rgba(88, 166, 255, 0.12);
+  border-radius: 8px;
+  max-width: 92vw;
+  text-align: center;
+}
+
 .voice-hint {
   font-size: 0.82rem;
   color: #e6edf3;

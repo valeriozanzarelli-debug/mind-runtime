@@ -247,7 +247,19 @@ def _make_handler(server: NurseryServer):
             if path == "/api/baby/autonomous":
                 return _json(self, server._with_lock(server.baby.autonomous_tick))
             if path == "/api/baby/flow":
-                return _json(self, server._with_lock(server.baby.flow))
+                return _json(
+                    self,
+                    server._with_lock(
+                        lambda: server.baby.flow(
+                            image_gray=body.get("image_gray"),
+                            image_b64=body.get("image_b64"),
+                            image_w=int(body.get("image_w", 64)),
+                            image_h=int(body.get("image_h", 64)),
+                            color_rgb=body.get("color_rgb"),
+                            image_rgba=body.get("image_rgba"),
+                        )
+                    ),
+                )
             if path == "/api/baby/look":
                 return _json(
                     self,
@@ -487,6 +499,19 @@ def _make_handler(server: NurseryServer):
                 )
             if path == "/api/baby/sleep":
                 return _json(self, server._with_lock(server.baby.sleep_cycle))
+            if path == "/api/baby/stabilize":
+                return _json(
+                    self,
+                    server._with_lock(
+                        lambda: server.baby.stabilize(
+                            aggressive=bool(body.get("aggressive", True)),
+                        )
+                    ),
+                )
+            if path == "/api/baby/wake":
+                return _json(self, server._with_lock(server.baby.wake))
+            if path == "/api/baby/dormant":
+                return _json(self, server._with_lock(server.baby.enter_dormant))
             if path == "/api/baby/correct":
                 return _json(
                     self,

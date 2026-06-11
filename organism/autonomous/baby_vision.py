@@ -375,6 +375,110 @@ class BabyVisionMixin:
             "features": feat,
         }
 
+    def perceive_vision(
+        self,
+        *,
+        image_gray: list[int] | None = None,
+        image_b64: str | None = None,
+        image_w: int = 64,
+        image_h: int = 64,
+        color_rgb: dict[str, float] | None = None,
+        image_rgba: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Percezione silenziosa — aggiorna cervello e coscienza, zero speech spontaneo."""
+        org = self._ensure()
+        has_frame = bool(image_gray or image_b64 or image_rgba)
+        attended: dict[str, Any] | None = None
+        if has_frame:
+            grid, sig = self._decode_vision(
+                image_gray=image_gray,
+                image_b64=image_b64,
+                image_w=image_w,
+                image_h=image_h,
+                color_rgb=color_rgb,
+                image_rgba=image_rgba,
+            )
+            if not grid:
+                return {"perceived": False, "skipped": "no_image", "dormant": self._dormant}
+            if sig == self._last_glance_sig:
+                return {
+                    "perceived": False,
+                    "skipped": "same_scene",
+                    "scene_sig": sig,
+                    "dormant": self._dormant,
+                    "moment": self._last_moment.to_dict() if self._last_moment else None,
+                }
+            if sig != self._last_glance_sig:
+                self._last_glance_t = time.time()
+                self._last_glance_sig = sig
+                attended = self._vision_attend(
+                    org,
+                    image_gray=image_gray,
+                    image_b64=image_b64,
+                    image_w=image_w,
+                    image_h=image_h,
+                    color_rgb=color_rgb,
+                    image_rgba=image_rgba,
+                )
+                if attended:
+                    rec = attended.get("rec")
+                    themes = list(attended.get("themes") or [])
+                    if rec:
+                        self._append_consciousness([f"vede · {rec}"])
+                    elif themes:
+                        self._append_consciousness([f"osserva · {' · '.join(themes[:4])}"])
+
+        em = self.speech.readout() if self.speech else None
+        arousal = inject_circadian(org.brain)
+        brain = (
+            read_brain_mood(
+                org.brain,
+                synapses_at_birth=self._synapses_at_birth,
+                motor_pressure=em.motor_pressure if em else 0.0,
+                inhibition=em.inhibition if em else 0.0,
+                wants_voice=False,
+                arousal=arousal,
+            ).to_dict()
+            if em
+            else {}
+        )
+        themes = list((attended or {}).get("themes") or [])
+        symbols = list((attended or {}).get("symbols") or [])
+        impulse = str((attended or {}).get("impulse") or "attend")
+        dream = self.dream_engine.state.to_dict()
+        inner = self._last_inner_voice or ""
+        if dream.get("active") and dream.get("content"):
+            self._append_consciousness([f"sogna · {str(dream['content'])[:72]}"])
+        elif inner and not has_frame:
+            self._append_consciousness([f"pensa · {inner[:72]}"])
+
+        moment = BabyMoment(
+            impulse=impulse,
+            spoke="",
+            stimulus_key=stimulus_key_visual_context(vision_hash=self._last_vision_hash)
+            if self._last_vision_hash
+            else "idle",
+            curiosity=self.curiosity.state.to_dict(),
+            learned=bool((attended or {}).get("rec")),
+            brain=brain,
+            thought={"themes": themes, "symbols": symbols, "pressure": 0.25},
+            wanted_to_speak=False,
+            dream=dream,
+            emotion=self.affect.state.to_dict(),
+            presence=self._last_presence,
+            consciousness_stream=self.consciousness_recent(8),
+        )
+        self._last_moment = moment
+        return {
+            "perceived": bool(attended),
+            "recognized": (attended or {}).get("rec"),
+            "moment": moment.to_dict(),
+            "brain": brain,
+            "dormant": self._dormant,
+            "consciousness": self.consciousness_events(limit=16),
+            "stats": org.stats,
+        }
+
     def glance(
         self,
         *,
@@ -386,14 +490,9 @@ class BabyVisionMixin:
         image_rgba: list[int] | None = None,
         min_interval_s: float = 10.0,
     ) -> dict[str, Any]:
-        """Sguardo passivo — scena nuova: riconosce o chiede da solo (telefono in tasca/mano)."""
-        now = time.time()
-        if now - self._last_glance_t < min_interval_s:
-            return {"moment": None, "skipped": "rate_limit"}
-
-        org = self._ensure()
-        self._vision_fresh = bool(image_gray or image_b64 or image_rgba)
-        grid, sig = self._decode_vision(
+        """Sguardo passivo — solo percezione silenziosa (niente speech spontaneo)."""
+        _ = min_interval_s
+        return self.perceive_vision(
             image_gray=image_gray,
             image_b64=image_b64,
             image_w=image_w,
@@ -401,59 +500,3 @@ class BabyVisionMixin:
             color_rgb=color_rgb,
             image_rgba=image_rgba,
         )
-        if not grid:
-            return {"moment": None, "skipped": "no_image"}
-        if sig == self._last_glance_sig:
-            return {"moment": None, "skipped": "same_scene", "scene_sig": sig}
-
-        self._last_glance_t = now
-        self._last_glance_sig = sig
-
-        attended = self._vision_attend(
-            org,
-            image_gray=image_gray,
-            image_b64=image_b64,
-            image_w=image_w,
-            image_h=image_h,
-            color_rgb=color_rgb,
-            image_rgba=image_rgba,
-        )
-        if not attended:
-            return {"moment": None, "skipped": "no_image"}
-
-        rec = attended["rec"]
-        conf = attended["conf"]
-        impulse = attended["impulse"]
-        themes = attended["themes"]
-        symbols = attended["symbols"]
-        focus = attended["focus"]
-        feat = attended["feat"]
-
-        spoke = ""
-        if rec:
-            spoke = self._visual_utterance(org)
-            if spoke and self._is_stuck_repeat(spoke):
-                spoke = ""
-        if not spoke and impulse == "ask":
-            spoke = self._ensure_ask_speech(org, themes=themes, symbols=symbols, focus=str(focus))
-
-        if not spoke:
-            return {
-                "moment": None,
-                "skipped": "silent",
-                "recognized": rec,
-                "confidence": round(conf, 2),
-                "scene_sig": sig,
-            }
-
-        moment = self._vision_moment(org, attended, spoke=spoke)
-        fc = self._face_context()
-        return {
-            "moment": moment.to_dict(),
-            "recognized": rec,
-            "confidence": round(conf, 2),
-            "features": feat,
-            "scene_sig": sig,
-            "novel": True,
-            "face": fc,
-        }
