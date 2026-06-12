@@ -102,6 +102,7 @@ class OrganismRuntime:
     @classmethod
     def baby(cls, seed: int = 42, **kwargs) -> OrganismRuntime:
         from mind.runtime import MindRuntime
+        from mind.seed_it import build_italian_memory, build_italian_circuits
 
         variant_name = os.environ.get("ORGANISM_DNA_VARIANT", "baby")
         if variant_name == "genesis":
@@ -110,17 +111,27 @@ class OrganismRuntime:
         if not variant.exists():
             variant = Path(__file__).parent / "dna" / "variants" / "baby.yaml"
         org = cls(variant_path=variant, seed=seed, **kwargs)
-        org.mind_bridge = MindBridge(MindRuntime.blank())
+        # MIND italiano — rete di frammenti semantici, catene causali, identità
+        org.mind_bridge = MindBridge(MindRuntime(
+            memory=build_italian_memory(),
+            patterns=__import__("mind.pattern", fromlist=["PatternEngine"]).PatternEngine(),
+            sensations=build_italian_circuits(),
+        ))
         return org
 
     @classmethod
     def genesis(cls, seed: int = 42, **kwargs) -> OrganismRuntime:
-        """Genesis — DNA evoluto se presente, mente vuota."""
+        """Genesis — DNA evoluto se presente, MIND italiano."""
         from mind.runtime import MindRuntime
+        from mind.seed_it import build_italian_memory, build_italian_circuits
         from organism.dna.evolution import genesis_variant_path
 
         org = cls(variant_path=genesis_variant_path(), seed=seed, **kwargs)
-        org.mind_bridge = MindBridge(MindRuntime.blank())
+        org.mind_bridge = MindBridge(MindRuntime(
+            memory=build_italian_memory(),
+            patterns=__import__("mind.pattern", fromlist=["PatternEngine"]).PatternEngine(),
+            sensations=build_italian_circuits(),
+        ))
         return org
 
     @classmethod

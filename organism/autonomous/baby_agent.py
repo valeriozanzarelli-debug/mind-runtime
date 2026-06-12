@@ -180,6 +180,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             hypotheses=self.hypothesis_engine,
             curiosity_fn=lambda: self.curiosity.state.level,
             on_thought=self._on_spontaneous_thought,
+            mind=self.org.mind_bridge.mind,
         )
         self.thought_generator.start()
 
@@ -366,8 +367,28 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             if any(k in hl for k in ("programma", "codice", "scrivi", "python", "funzione")):
                 code_out = self.code.produce(heard) or None
 
+        # --- MIND spreading activation ---
+        # Interroga la memoria semantica italiana con il testo sentito.
+        # Se MIND attiva frammenti, i loro titoli diventano candidate_response
+        # e memory_themes per il compositore — bypassa il word soup.
+        mind_candidate: str = ""
+        mind_fragments: list[str] = []
+        if heard and not dialogue_text and not code_out:
+            from mind.types import Cue, CueKind
+            mind_result = org.mind_bridge.mind.think(
+                Cue(kind=CueKind.TEXT, value=heard.strip(), meta={"human": True})
+            )
+            if mind_result.fragments:
+                # Usa il frammento più rilevante come risposta candidata
+                best = mind_result.fragments[0]
+                mind_candidate = best.title
+                mind_fragments = [f.title for f in mind_result.fragments[:4]]
+                # Aggiungi simboli MIND al flusso di coscienza
+                for ft in mind_fragments[:2]:
+                    self._append_consciousness([f"memoria: {ft[:60]}"])
+
         unknown_words: list[str] = []
-        if heard and not has_path and not code_out:
+        if heard and not has_path and not code_out and not mind_candidate:
             unknown_words = self.self_learner.detect_unknown(
                 heard,
                 has_pathway=has_path,
@@ -403,6 +424,21 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         )
         if heard:
             self.composer.absorb(heard, boost=0.5)
+
+        # Topic threading: inietta le parole chiave dei frammenti MIND attivati
+        # nella working memory e nei temi del pensiero per coerenza multi-turno
+        if mind_fragments:
+            import re as _re_topic
+            topic_words: list[str] = []
+            for ft in mind_fragments[:3]:
+                for w in _re_topic.findall(r"[a-zàèéìòù]+", ft.lower()):
+                    if len(w) > 3 and w not in topic_words:
+                        topic_words.append(w)
+            if topic_words:
+                self.working_memory.activate(topic_words[:8], weight=0.7)
+                for w in topic_words[:4]:
+                    if w not in thought.themes:
+                        thought.themes.append(w)
 
         _code_noise = ("print", "def", "return", "range", "for", "else")
         thought.themes = [
@@ -641,6 +677,20 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
+        elif mind_candidate and wants_voice and not dialogue_text:
+            # MIND spreading activation ha trovato un frammento rilevante.
+            # Usa il titolo del frammento come risposta — è già una frase italiana completa.
+            # Nessun word soup: il significato viene dalla rete semantica, non dai neuroni casuali.
+            _mc = mind_candidate.strip()
+            if _mc and _mc[-1] not in ".?!":
+                _mc += "."
+            _mc = _mc[0].upper() + _mc[1:]
+            _plan = self.speech.plan_from_text(_mc) if self.speech else None
+            composed = ComposedSpeech(
+                text=_mc, kind="speech", from_thought=True,
+                thought_used=thought.themes[:6] + mind_fragments[:2],
+                motor_plan=_plan,
+            )
         elif dialogue_text and wants_voice:
             # Risposta dialogica appresa — usata DIRETTAMENTE per risposte lunghe (>= 5 parole).
             # Risposte brevi passano al percorso emergente (produce/long_form) con pathway_words.

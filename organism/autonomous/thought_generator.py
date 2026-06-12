@@ -32,6 +32,7 @@ class ThoughtGenerator:
         self._hypotheses: HypothesisEngine | None = None
         self._on_thought: Callable[[list[str]], None] | None = None
         self._curiosity_fn: Callable[[], float] | None = None
+        self._mind: Any | None = None  # MindRuntime opzionale
         self.pulses = 0
         self._last_themes: list[str] = []
         self._last_t = 0.0
@@ -45,6 +46,7 @@ class ThoughtGenerator:
         hypotheses: HypothesisEngine | None = None,
         on_thought: Callable[[list[str]], None] | None = None,
         curiosity_fn: Callable[[], float] | None = None,
+        mind: Any | None = None,
     ) -> None:
         self._brain = brain
         self._wm = working_memory
@@ -52,6 +54,7 @@ class ThoughtGenerator:
         self._hypotheses = hypotheses
         self._on_thought = on_thought
         self._curiosity_fn = curiosity_fn
+        self._mind = mind  # MindRuntime per pensiero guidato da semantica
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -94,8 +97,25 @@ class ThoughtGenerator:
         curiosity = self._curiosity_fn() if self._curiosity_fn else 0.4
         themes: list[str] = []
 
-        # Weighted activation — sinapsi forti guidano il salto
-        if brain.synapses:
+        # Primo: pensiero guidato da MIND — usa WM context per cercare connessioni semantiche
+        if self._mind and self._wm and curiosity > 0.3:
+            try:
+                from mind.types import Cue, CueKind
+                ctx = self._wm.context_words(limit=6)
+                if ctx:
+                    query = " ".join(ctx[:4])
+                    result = self._mind.think(Cue(kind=CueKind.TEXT, value=query))
+                    for frag in result.fragments[:3]:
+                        # Estrai parole chiave dal titolo del frammento
+                        import re as _re
+                        words = [w for w in _re.findall(r"[a-zàèéìòù]+", frag.title.lower())
+                                 if len(w) > 3]
+                        themes.extend(words[:3])
+            except Exception:
+                pass
+
+        # Secondo: sinapsi forti come ponti (fallback quando MIND non attiva)
+        if not themes and brain.synapses:
             sample = self.rng.sample(brain.synapses, min(40, len(brain.synapses)))
             weighted = sorted(sample, key=lambda s: -s.weight)[:12]
             for syn in weighted:
