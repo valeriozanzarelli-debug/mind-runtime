@@ -51,7 +51,7 @@ def build_italian_memory() -> MemoryGraph:
     # ------------------------------------------------------------------
     frags += [
         _f("identity_who", "sono un organismo cognitivo che impara dai sensi",
-           ["chi sei", "chi è baby", "chi", "sei", "chi sono"], weight=1.0, sensation=IDENTITY,
+           ["chi sei", "chi è baby", "chi sono io", "cosa sono"], weight=1.0, sensation=IDENTITY,
            links=["identity_name", "identity_nature", "identity_learning"]),
         _f("identity_name", "mi chiamano Baby, sono un agente cognitivo",
            ["come ti chiami", "nome", "baby", "chiamano", "chiami"], weight=0.9, sensation=IDENTITY,
@@ -189,7 +189,7 @@ def build_italian_memory() -> MemoryGraph:
            ["grazie", "thank", "perfetto", "bravo", "ottimo", "bene"], weight=0.8, sensation=SOCIAL,
            links=["social_interaction"]),
         _f("social_repeat", "posso riprovare con parole diverse — di cosa vuoi che parli",
-           ["ripeti", "ripetere", "non capisco", "spiega", "non ho capito"], weight=0.8, sensation=SOCIAL,
+           ["non ho capito", "puoi ripetere", "ripeti per favore", "non ho sentito"], weight=0.8, sensation=SOCIAL,
            links=["social_interaction", "learning_gaps"]),
         _f("social_understand", "credo di sì — ma se ho sbagliato, dimmi come correggere",
            ["hai capito", "capito", "capisce", "comprende", "hai capito grazie"], weight=0.85, sensation=SOCIAL,
@@ -197,6 +197,19 @@ def build_italian_memory() -> MemoryGraph:
         _f("social_explain", "posso provare a spiegare — di cosa vuoi sapere di più",
            ["spiegami", "mi spieghi", "spiega", "spiegare", "come funziona"], weight=0.8, sensation=SOCIAL,
            links=["social_interaction", "knowledge_world"]),
+        _f("talk_about_language", "il linguaggio è un sistema di simboli condivisi che permette di comunicare pensieri e concetti",
+           ["parlami del linguaggio", "dimmi del linguaggio", "raccontami del linguaggio", "linguaggio"], weight=0.9, sensation=KNOWLEDGE,
+           links=["language_what", "thinking_process"]),
+        _f("talk_about_brain", "milioni di neuroni si accendono insieme e le sinapsi che si ripetono diventano più forti",
+           ["parlami del cervello", "dimmi del cervello", "raccontami del cervello", "cervello"], weight=0.9, sensation=KNOWLEDGE,
+           links=["brain_how", "neuron_what"]),
+        _f("talk_about_me", "sono fatto di neuroni e sinapsi — imparo ascoltando, vedendo e ripetendo, cresco con ogni scambio",
+           ["parlami di te", "raccontami di te", "dimmi di te", "parlami di", "parla di te",
+            "raccontami su di te", "di te stesso", "te stesso"], weight=0.95, sensation=IDENTITY,
+           links=["identity_who", "identity_nature"]),
+        _f("something_interesting", "le sinapsi che si usano di più diventano più veloci — è per questo che la pratica migliora le abilità",
+           ["cosa sai di interessante", "dimmi qualcosa", "cosa sai", "qualcosa di interessante", "interessante"], weight=0.85, sensation=KNOWLEDGE,
+           links=["plasticity", "learning_how"]),
     ]
 
     # ------------------------------------------------------------------

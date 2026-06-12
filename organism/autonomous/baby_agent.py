@@ -373,19 +373,28 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         # e memory_themes per il compositore — bypassa il word soup.
         mind_candidate: str = ""
         mind_fragments: list[str] = []
-        if heard and not dialogue_text and not code_out:
+        if heard and not code_out:
             from mind.types import Cue, CueKind
+            import re as _re_mind
             mind_result = org.mind_bridge.mind.think(
                 Cue(kind=CueKind.TEXT, value=heard.strip(), meta={"human": True})
             )
             if mind_result.fragments:
-                # Usa il frammento più rilevante come risposta candidata
                 best = mind_result.fragments[0]
                 mind_candidate = best.title
                 mind_fragments = [f.title for f in mind_result.fragments[:4]]
-                # Aggiungi simboli MIND al flusso di coscienza
                 for ft in mind_fragments[:2]:
                     self._append_consciousness([f"memoria: {ft[:60]}"])
+
+            # MIND interviene solo se il dialogo insegnato è breve (< 4 parole)
+            # e MIND offre una risposta sostanzialmente più ricca.
+            # Dialogo insegnato lungo o task specifici prendono priorità assoluta.
+            if dialogue_text and mind_candidate:
+                _dt_quick = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", dialogue_text.lower()) if len(w) > 2]
+                _mc_words = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_candidate.lower()) if len(w) > 2]
+                # Usa MIND solo se: dialogo è molto corto (< 4) E MIND è sostanzialmente più ricco (>= 6)
+                if len(_dt_quick) < 4 and len(_mc_words) >= 6:
+                    dialogue_text = ""  # MIND ha risposta più ricca di saluto generico
 
         unknown_words: list[str] = []
         if heard and not has_path and not code_out and not mind_candidate:
@@ -677,7 +686,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
-        elif mind_candidate and wants_voice and not dialogue_text:
+        elif mind_candidate and wants_voice:
             # MIND spreading activation ha trovato un frammento rilevante.
             # Usa il titolo del frammento come risposta — è già una frase italiana completa.
             # Nessun word soup: il significato viene dalla rete semantica, non dai neuroni casuali.
