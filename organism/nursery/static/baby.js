@@ -105,10 +105,25 @@ function phraseEchoesSelf(phrase) {
   return inter / Math.max(pw.length, ow.length) >= 0.55;
 }
 
+function voiceQualityScore(v) {
+  const name = (v.name || "").toLowerCase();
+  let score = 0;
+  if (v.lang && v.lang.startsWith("it")) score += 10;
+  if (name.includes("google")) score += 8;
+  if (name.includes("microsoft") || name.includes("natural")) score += 6;
+  if (name.includes("premium") || name.includes("neural")) score += 5;
+  if (v.localService) score += 2;
+  if (name.includes("compact") || name.includes("espeak")) score -= 6;
+  return score;
+}
+
 function pickItalianVoice() {
   if (italianVoice) return italianVoice;
   const voices = synth.getVoices();
-  italianVoice = voices.find((v) => v.lang && v.lang.startsWith("it")) || voices[0] || null;
+  const italian = voices.filter((v) => v.lang && v.lang.startsWith("it"));
+  italianVoice = italian.sort((a, b) => voiceQualityScore(b) - voiceQualityScore(a))[0]
+    || voices[0]
+    || null;
   return italianVoice;
 }
 
@@ -176,7 +191,7 @@ function doSpeak(text, onDone) {
   lastSpoke = text;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = LOCALE;
-  const vp = emotionVoiceParams();
+  const vp = emotionVoiceParams(text);
   u.rate   = vp.rate;
   u.pitch  = vp.pitch;
   u.volume = vp.volume;
@@ -225,6 +240,8 @@ function idleHint() {
 
 // Stato emotivo corrente — aggiornato ad ogni momento
 let currentEmotion = { dominant: "curiosity", joy: 0.3, fear: 0.0, sadness: 0.0, shame: 0.0, trust: 0.5, curiosity: 0.6, anger: 0.0 };
+let currentBrainSignal = { arousal: 0.35, motor_pressure: 0.5, ignition: 0.4 };
+let lastUtterancePitch = 1.0;
 
 function applyBrain(brain, moment) {
   if (!brain) return;
@@ -233,6 +250,11 @@ function applyBrain(brain, moment) {
   synGrown.textContent = grown > 0 ? `+${grown} da quando è nato` : "";
   motorBar.style.width = `${Math.min(100, (brain.motor_pressure ?? 0) * 100)}%`;
   inhibBar.style.width = `${Math.min(100, (brain.inhibition ?? 0) * 100)}%`;
+  currentBrainSignal = {
+    arousal: brain.arousal ?? 0.35,
+    motor_pressure: brain.motor_pressure ?? 0.5,
+    ignition: moment?.consciousness?.ignition ?? 0.4,
+  };
   if (consciousBar && moment?.consciousness) {
     consciousBar.style.width = `${Math.min(100, (moment.consciousness.ignition ?? 0) * 100)}%`;
   }
@@ -256,54 +278,83 @@ function applyBrain(brain, moment) {
   }
 }
 
-/** Parametri voce in base allo stato emotivo corrente.
- *  La voce riflette l'interno — non è recitazione, è lo stato che parla. */
-function emotionVoiceParams() {
+/** Parametri voce — blend continuo di emozione + arousal + forma del testo.
+ *  Ogni frase suona diversa: jitter micro, domande in salita, frasi lunghe più lente. */
+function emotionVoiceParams(text = "") {
   const e = currentEmotion;
-  const joy     = e.joy     ?? 0;
-  const fear    = e.fear    ?? 0;
+  const b = currentBrainSignal;
+  const joy = e.joy ?? 0;
+  const fear = e.fear ?? 0;
   const sadness = e.sadness ?? 0;
-  const shame   = e.shame   ?? 0;
-  const trust   = e.trust   ?? 0.5;
+  const shame = e.shame ?? 0;
+  const anger = e.anger ?? 0;
+  const trust = e.trust ?? 0.5;
   const curiosity = e.curiosity ?? 0.4;
-  const stress  = shame + fear + sadness;
+  const arousal = b.arousal ?? 0.35;
+  const motor = b.motor_pressure ?? 0.5;
+  const ignition = b.ignition ?? 0.4;
+  const stress = shame + fear + sadness;
 
-  let pitch  = 1.0;
-  let rate   = 0.88;
-  let volume = 1.0;
+  let pitch = 1.0
+    + joy * 0.12
+    + curiosity * 0.08
+    + fear * 0.14
+    + anger * 0.07
+    - sadness * 0.11
+    - shame * 0.09
+    - trust * 0.04
+    + (arousal - 0.35) * 0.28
+    + (motor - 0.5) * 0.12
+    + (ignition - 0.4) * 0.08;
+
+  let rate = 0.88
+    + joy * 0.06
+    + fear * 0.09
+    + curiosity * 0.04
+    - sadness * 0.13
+    - shame * 0.09
+    - trust * 0.05
+    + (arousal - 0.35) * 0.22
+    + (motor - 0.5) * 0.08;
+
+  let volume = 0.92
+    + joy * 0.06
+    - fear * 0.07
+    - shame * 0.11
+    + trust * 0.05;
 
   if (stress > 1.3) {
-    // Sotto forte stress / quasi pianto — voce spezzata, lenta, bassa
-    pitch  = 0.78 + Math.random() * 0.08;  // trema leggermente
-    rate   = 0.72;
-    volume = 0.75;
-  } else if (sadness > 0.5 || shame > 0.4) {
-    // Triste o in imbarazzo — voce più lenta e bassa
-    pitch  = 0.88;
-    rate   = 0.80;
-    volume = 0.85;
-  } else if (fear > 0.4) {
-    // Spaventato — voce più alta e rapida
-    pitch  = 1.15;
-    rate   = 1.05;
-    volume = 0.9;
-  } else if (joy > 0.6) {
-    // Felice/eccitato — voce più alta e vivace
-    pitch  = 1.12;
-    rate   = 0.95;
-    volume = 1.0;
-  } else if (curiosity > 0.65) {
-    // Curioso — tono leggermente su, ritmo normale
-    pitch  = 1.05;
-    rate   = 0.90;
-    volume = 1.0;
-  } else if (trust > 0.7) {
-    // Calmo/fiducioso — tono basso, voce lenta e misurata
-    pitch  = 0.95;
-    rate   = 0.85;
-    volume = 1.0;
+    pitch = 0.76 + Math.random() * 0.1;
+    rate = 0.70 + Math.random() * 0.04;
+    volume = 0.72 + Math.random() * 0.06;
   }
 
+  const t = (text || "").trim();
+  if (t.includes("?")) {
+    pitch += 0.07;
+    rate += 0.03;
+  }
+  if (t.includes("!")) {
+    pitch += 0.05;
+    rate += 0.05;
+    volume = Math.min(1, volume + 0.05);
+  }
+  if (t.includes("…") || t.includes("...")) rate -= 0.05;
+  if (t.length < 22) rate += 0.05;
+  else if (t.length > 85) rate -= 0.07;
+
+  const jitter = () => (Math.random() - 0.5) * 0.08;
+  pitch += jitter();
+  rate += jitter() * 0.55;
+  volume += jitter() * 0.15;
+
+  pitch += (lastUtterancePitch - pitch) * -0.18;
+
+  pitch = Math.max(0.72, Math.min(1.30, pitch));
+  rate = Math.max(0.68, Math.min(1.14, rate));
+  volume = Math.max(0.65, Math.min(1.0, volume));
+
+  lastUtterancePitch = pitch;
   return { pitch, rate, volume };
 }
 
