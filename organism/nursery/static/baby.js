@@ -176,9 +176,10 @@ function doSpeak(text, onDone) {
   lastSpoke = text;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = LOCALE;
-  u.rate = 0.9;
-  u.pitch = 1.05;
-  u.volume = 1;
+  const vp = emotionVoiceParams();
+  u.rate   = vp.rate;
+  u.pitch  = vp.pitch;
+  u.volume = vp.volume;
   const voice = pickItalianVoice();
   if (voice) u.voice = voice;
   const finish = () => {
@@ -222,6 +223,9 @@ function idleHint() {
   }
 }
 
+// Stato emotivo corrente — aggiornato ad ogni momento
+let currentEmotion = { dominant: "curiosity", joy: 0.3, fear: 0.0, sadness: 0.0, shame: 0.0, trust: 0.5, curiosity: 0.6, anger: 0.0 };
+
 function applyBrain(brain, moment) {
   if (!brain) return;
   synCount.textContent = (brain.synapses ?? 0).toLocaleString("it-IT");
@@ -232,12 +236,16 @@ function applyBrain(brain, moment) {
   if (consciousBar && moment?.consciousness) {
     consciousBar.style.width = `${Math.min(100, (moment.consciousness.ignition ?? 0) * 100)}%`;
   }
-  orb.classList.remove("wants-voice", "conscious", "afraid", "happy", "sleeping");
+  orb.classList.remove("wants-voice", "conscious", "afraid", "happy", "sleeping", "sad", "stressed");
   if (dormant) orb.classList.add("sleeping");
   const emo = moment?.emotion;
   const tone = moment?.social_tone;
+  if (emo) Object.assign(currentEmotion, emo);
   if (emo?.dominant === "fear" || tone?.is_angry) orb.classList.add("afraid");
   else if (emo?.dominant === "joy") orb.classList.add("happy");
+  else if (emo?.dominant === "sadness" || (emo?.sadness > 0.5)) orb.classList.add("sad");
+  const stress = (emo?.shame ?? 0) + (emo?.fear ?? 0) + (emo?.sadness ?? 0);
+  if (stress > 1.2) orb.classList.add("stressed");
   if (moment?.consciousness?.conscious) {
     orb.classList.add("conscious");
     if (!isSelfSpeaking) {
@@ -246,6 +254,57 @@ function applyBrain(brain, moment) {
   } else if (!isHolding && !holdStarted && !phraseBusy && !micActive && !isSelfSpeaking) {
     idleHint();
   }
+}
+
+/** Parametri voce in base allo stato emotivo corrente.
+ *  La voce riflette l'interno — non è recitazione, è lo stato che parla. */
+function emotionVoiceParams() {
+  const e = currentEmotion;
+  const joy     = e.joy     ?? 0;
+  const fear    = e.fear    ?? 0;
+  const sadness = e.sadness ?? 0;
+  const shame   = e.shame   ?? 0;
+  const trust   = e.trust   ?? 0.5;
+  const curiosity = e.curiosity ?? 0.4;
+  const stress  = shame + fear + sadness;
+
+  let pitch  = 1.0;
+  let rate   = 0.88;
+  let volume = 1.0;
+
+  if (stress > 1.3) {
+    // Sotto forte stress / quasi pianto — voce spezzata, lenta, bassa
+    pitch  = 0.78 + Math.random() * 0.08;  // trema leggermente
+    rate   = 0.72;
+    volume = 0.75;
+  } else if (sadness > 0.5 || shame > 0.4) {
+    // Triste o in imbarazzo — voce più lenta e bassa
+    pitch  = 0.88;
+    rate   = 0.80;
+    volume = 0.85;
+  } else if (fear > 0.4) {
+    // Spaventato — voce più alta e rapida
+    pitch  = 1.15;
+    rate   = 1.05;
+    volume = 0.9;
+  } else if (joy > 0.6) {
+    // Felice/eccitato — voce più alta e vivace
+    pitch  = 1.12;
+    rate   = 0.95;
+    volume = 1.0;
+  } else if (curiosity > 0.65) {
+    // Curioso — tono leggermente su, ritmo normale
+    pitch  = 1.05;
+    rate   = 0.90;
+    volume = 1.0;
+  } else if (trust > 0.7) {
+    // Calmo/fiducioso — tono basso, voce lenta e misurata
+    pitch  = 0.95;
+    rate   = 0.85;
+    volume = 1.0;
+  }
+
+  return { pitch, rate, volume };
 }
 
 function formatTime(ts) {

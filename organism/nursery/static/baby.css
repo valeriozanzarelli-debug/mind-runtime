@@ -112,6 +112,21 @@ body {
   box-shadow: 0 0 75px rgba(63, 185, 80, 0.55);
   background: radial-gradient(circle at 35% 35%, #3fb950, #1a3020 60%);
 }
+.orb.sad {
+  box-shadow: 0 0 60px rgba(80, 110, 180, 0.5);
+  background: radial-gradient(circle at 35% 35%, #3a5090, #0d1525 60%);
+  animation: pulse 4s ease-in-out infinite;
+}
+.orb.stressed {
+  box-shadow: 0 0 80px rgba(200, 80, 200, 0.6);
+  background: radial-gradient(circle at 35% 35%, #7a2080, #1a0520 60%);
+  animation: shake 0.4s ease-in-out infinite;
+}
+@keyframes shake {
+  0%, 100% { transform: scale(1) translateX(0); }
+  25% { transform: scale(1.01) translateX(-1px); }
+  75% { transform: scale(1.01) translateX(1px); }
+}
 .orb.sleeping { opacity: 0.45; transform: scale(0.85); animation: none; }
 
 @keyframes pulse {
