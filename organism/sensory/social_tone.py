@@ -51,6 +51,33 @@ def analyze_social_tone(text: str, *, last_spoke: str = "") -> SocialTone:
     valence = 0.0
     arousal = 0.15
 
+    # --- Segnali energetici dal testo (tono, non solo contenuto) ---
+
+    # Lettere ripetute: "CIAOOO" → alta eccitazione; "ohhh" → sorpresa/emozione
+    import re as _re
+    repeated = _re.findall(r"([a-zA-Z])\1{2,}", t)
+    if repeated:
+        markers.append("repeated_letters")
+        arousal += min(0.5, len(repeated) * 0.15)
+        valence += 0.1  # di solito positivo (entusiasmo)
+
+    # Puntini di sospensione: "ciao..." → riflessivo, incerto, lento
+    if "..." in t or "…" in t:
+        markers.append("ellipsis")
+        arousal -= 0.1
+        valence -= 0.05  # incertezza/esitazione
+
+    # "eh" o "no?" finale: "ciao eh" → aspetta risposta, tono piatto
+    if re.search(r"\beh\b", tl) or tl.endswith(" no?") or tl.endswith(" eh?"):
+        markers.append("trailing_check")
+        arousal -= 0.08
+        # tono interrogativo/aspettativo
+
+    # Maiuscole in tutto: "CIAO" → enfasi/volume alto
+    if t.isupper() and len(t) > 2:
+        markers.append("all_caps")
+        arousal += 0.3
+
     angry_hits = sum(1 for w in _ANGER if w in tl)
     if angry_hits:
         markers.append("anger_lex")

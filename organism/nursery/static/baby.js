@@ -31,7 +31,6 @@ const cam = document.getElementById("cam");
 const frameCanvas = document.getElementById("frame-canvas");
 const btnHand = document.getElementById("btn-hand");
 const btnMic = document.getElementById("btn-mic");
-const btnTrain = document.getElementById("btn-train");
 
 function handBtn(fn) {
   if (btnHand) fn(btnHand);
@@ -205,7 +204,7 @@ function speak(text) {
   if (!text) return;
   if (!voiceUnlocked) {
     enqueueSpeak(text);
-    voiceHint.textContent = "tocca lo schermo per sentire la voce";
+    voiceHint.textContent = "";
     return;
   }
   enqueueSpeak(text);
@@ -567,7 +566,10 @@ function setupMicRecognition() {
   micRecognition.onend = () => {
     micActive = false;
     btnMic?.classList.remove("listening");
-    if (!isSelfSpeaking) idleHint();
+    // Auto-riavvia dopo ogni utterance — sempre in ascolto quando non parla
+    if (born && userActivated && !isSelfSpeaking) {
+      setTimeout(() => beginMicListen(), 400);
+    }
   };
   micRecognition.onerror = (e) => {
     micActive = false;
@@ -659,6 +661,10 @@ function startContinuousFlow() {
 
 function onUserActivate() {
   unlockVoice();
+  // Al primo tocco/click, avvia subito il microfono se Baby è pronto
+  if (born && !micActive && !isSelfSpeaking) {
+    setTimeout(() => beginMicListen(), 300);
+  }
 }
 
 function onHandDown(e) {
@@ -690,15 +696,26 @@ function onHandUp(e) {
   }
 }
 
+// Mic: click-to-toggle (non più push-to-talk).
+// Baby è un organismo — ascolta quando parli, non ha bisogno di un bottone da tenere premuto.
 function onMicDown(e) {
   e.preventDefault();
   unlockVoice();
-  beginMicListen();
+  if (micActive) {
+    endMicListen();
+  } else {
+    beginMicListen();
+  }
 }
 
-function onMicUp(e) {
-  e.preventDefault();
-  endMicListen();
+// Auto-riavvia il microfono dopo che Baby ha finito di parlare
+function restartMicAfterSpeak() {
+  if (!born || !userActivated) return;
+  setTimeout(() => {
+    if (!micActive && !isSelfSpeaking && Date.now() > selfSpeakGuardUntil) {
+      beginMicListen();
+    }
+  }, 600);
 }
 
 if (btnHand) {
@@ -712,11 +729,8 @@ if (btnHand) {
 
 if (btnMic) {
   btnMic.addEventListener("mousedown", onMicDown);
-  btnMic.addEventListener("mouseup", onMicUp);
-  btnMic.addEventListener("mouseleave", () => { if (micActive) onMicUp({ preventDefault() {} }); });
   btnMic.addEventListener("touchstart", onMicDown, { passive: false });
-  btnMic.addEventListener("touchend", onMicUp, { passive: false });
-  btnMic.addEventListener("touchcancel", onMicUp, { passive: false });
+  // Click-to-toggle: no mouseup/touchend stop
 }
 
 document.body.addEventListener("touchstart", onUserActivate, { passive: true });
@@ -729,29 +743,6 @@ if (chatForm) {
     e.preventDefault();
     unlockVoice();
     sendChat();
-  });
-}
-
-if (btnTrain) {
-  btnTrain.addEventListener("click", async () => {
-    if (!born) { setStatus("baby non ancora nato"); return; }
-    btnTrain.disabled = true;
-    setStatus("training fondazionale in corso (~ 3 s)...");
-    try {
-      const r = await api("/api/baby/train-foundation", { repeats: 1 });
-      if (r.error) {
-        setStatus("errore training: " + r.error);
-      } else {
-        setStatus(`training ok — ${r.vocab || 0} parole, ${r.dialogue_pairs || 0} dialoghi`);
-        await stabilizeBaby();
-        refreshState();
-      }
-    } catch (err) {
-      console.error("train-foundation", err);
-      setStatus("errore training — riprova");
-    } finally {
-      btnTrain.disabled = false;
-    }
   });
 }
 

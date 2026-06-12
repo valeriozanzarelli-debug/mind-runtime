@@ -367,11 +367,10 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             if any(k in hl for k in ("programma", "codice", "scrivi", "python", "funzione")):
                 code_out = self.code.produce(heard) or None
 
-        # --- MIND spreading activation ---
-        # Interroga la memoria semantica italiana con il testo sentito.
-        # Se MIND attiva frammenti, i loro titoli diventano candidate_response
-        # e memory_themes per il compositore — bypassa il word soup.
-        mind_candidate: str = ""
+        # --- MIND come knowledge layer (non response layer) ---
+        # MIND attiva frammenti semantici → arricchisce memory_themes e contesto.
+        # La risposta NON viene da MIND direttamente — emerge dal compositore
+        # con stato affettivo, tono input e contesto semantico combinati.
         mind_fragments: list[str] = []
         if heard and not code_out:
             from mind.types import Cue, CueKind
@@ -380,24 +379,19 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 Cue(kind=CueKind.TEXT, value=heard.strip(), meta={"human": True})
             )
             if mind_result.fragments:
-                best = mind_result.fragments[0]
-                mind_candidate = best.title
                 mind_fragments = [f.title for f in mind_result.fragments[:4]]
                 for ft in mind_fragments[:2]:
                     self._append_consciousness([f"memoria: {ft[:60]}"])
-
-            # MIND interviene solo se il dialogo insegnato è breve (< 4 parole)
-            # e MIND offre una risposta sostanzialmente più ricca.
-            # Dialogo insegnato lungo o task specifici prendono priorità assoluta.
-            if dialogue_text and mind_candidate:
-                _dt_quick = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", dialogue_text.lower()) if len(w) > 2]
-                _mc_words = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_candidate.lower()) if len(w) > 2]
-                # Usa MIND solo se: dialogo è molto corto (< 4) E MIND è sostanzialmente più ricco (>= 6)
-                if len(_dt_quick) < 4 and len(_mc_words) >= 6:
-                    dialogue_text = ""  # MIND ha risposta più ricca di saluto generico
+            # Se dialogo insegnato è brevissimo E MIND ha contesto ricco →
+            # libera il compositore a generare risposta variabile (non il titolo fisso)
+            if dialogue_text and mind_fragments:
+                _dt_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", dialogue_text.lower()) if len(w) > 2]
+                _mf_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_fragments[0].lower()) if len(w) > 2]
+                if len(_dt_w) < 4 and len(_mf_w) >= 6:
+                    dialogue_text = ""
 
         unknown_words: list[str] = []
-        if heard and not has_path and not code_out and not mind_candidate:
+        if heard and not has_path and not code_out and not mind_fragments:
             unknown_words = self.self_learner.detect_unknown(
                 heard,
                 has_pathway=has_path,
@@ -435,7 +429,8 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             self.composer.absorb(heard, boost=0.5)
 
         # Topic threading: inietta le parole chiave dei frammenti MIND attivati
-        # nella working memory e nei temi del pensiero per coerenza multi-turno
+        # nella working memory e nei temi del pensiero per coerenza multi-turno.
+        # I frammenti sono KNOWLEDGE — colorano il pensiero, non generano risposte fisse.
         if mind_fragments:
             import re as _re_topic
             topic_words: list[str] = []
@@ -686,20 +681,6 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
-        elif mind_candidate and wants_voice:
-            # MIND spreading activation ha trovato un frammento rilevante.
-            # Usa il titolo del frammento come risposta — è già una frase italiana completa.
-            # Nessun word soup: il significato viene dalla rete semantica, non dai neuroni casuali.
-            _mc = mind_candidate.strip()
-            if _mc and _mc[-1] not in ".?!":
-                _mc += "."
-            _mc = _mc[0].upper() + _mc[1:]
-            _plan = self.speech.plan_from_text(_mc) if self.speech else None
-            composed = ComposedSpeech(
-                text=_mc, kind="speech", from_thought=True,
-                thought_used=thought.themes[:6] + mind_fragments[:2],
-                motor_plan=_plan,
-            )
         elif dialogue_text and wants_voice:
             # Risposta dialogica appresa — usata DIRETTAMENTE per risposte lunghe (>= 5 parole).
             # Risposte brevi passano al percorso emergente (produce/long_form) con pathway_words.
