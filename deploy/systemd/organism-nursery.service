@@ -17,7 +17,7 @@ Environment=ORGANISM_PULSE_INTERVAL=1.2
 Environment=ORGANISM_MAX_NEURONS=35000
 Environment=ORGANISM_GROWTH_BATCH=120
 Environment=ORGANISM_GROWTH_EVERY=20
-Environment=ORGANISM_ALLOW_REBIRTH=0
+Environment=ORGANISM_ALLOW_REBIRTH=1
 ExecStart=/opt/mind-runtime/.venv/bin/python -m organism.nursery.server --host 127.0.0.1 --port 8765 --base-path /organism
 Restart=on-failure
 RestartSec=5
