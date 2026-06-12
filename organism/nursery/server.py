@@ -57,6 +57,7 @@ class NurseryServer:
 
     def start(self, *, open_browser: bool = False) -> None:
         self._brain_pulse.start()
+        self._start_sleep_scheduler()
         handler = _make_handler(self)
         self._server = ThreadingHTTPServer((self.host, self.port), handler)
         local = f"http://{self.host}:{self.port}{self.base_path or '/'}"
@@ -75,6 +76,34 @@ class NurseryServer:
         except KeyboardInterrupt:
             print("\nChiuso.")
             self._server.shutdown()
+
+    def _start_sleep_scheduler(self) -> None:
+        """Sonno automatico: Baby dorme ogni notte tra le 2:00 e le 3:00 (ora server).
+        
+        Come un bambino: le sinapsi deboli vengono potate, quelle forti consolidate.
+        Un ciclo di sonno al giorno è sufficiente per mantenere il cervello efficiente.
+        """
+        import time as _time
+
+        def _sleep_loop() -> None:
+            last_sleep_day = -1
+            while True:
+                try:
+                    _time.sleep(60)  # controlla ogni minuto
+                    now_h = int(__import__("datetime").datetime.now().hour)
+                    now_d = int(__import__("datetime").datetime.now().toordinal())
+                    # Dorme tra le 2:00 e le 3:00, una volta al giorno
+                    if now_h == 2 and now_d != last_sleep_day and self.baby._born:
+                        with self._lock:
+                            result = self.baby.sleep_cycle()
+                        last_sleep_day = now_d
+                        print(f"[sonno automatico] pruned={result.get('pruned',0)} "
+                              f"consolidated={result.get('episodes_consolidated',0)}")
+                except Exception:
+                    pass
+
+        t = threading.Thread(target=_sleep_loop, name="sleep-scheduler", daemon=True)
+        t.start()
 
     def _with_lock(self, fn):
         try:
