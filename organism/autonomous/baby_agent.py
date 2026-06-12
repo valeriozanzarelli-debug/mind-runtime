@@ -367,11 +367,12 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             if any(k in hl for k in ("programma", "codice", "scrivi", "python", "funzione")):
                 code_out = self.code.produce(heard) or None
 
-        # --- MIND come knowledge layer (non response layer) ---
-        # MIND attiva frammenti semantici → arricchisce memory_themes e contesto.
-        # La risposta NON viene da MIND direttamente — emerge dal compositore
-        # con stato affettivo, tono input e contesto semantico combinati.
+        # --- MIND come knowledge layer E response candidate ---
+        # MIND attiva frammenti semantici → arricchisce memory_themes E offre
+        # risposta candidata. La variazione viene dall'articulability check:
+        # frammenti che Baby non sa ancora articolare vengono usati solo come contesto.
         mind_fragments: list[str] = []
+        mind_candidate: str = ""
         if heard and not code_out:
             from mind.types import Cue, CueKind
             import re as _re_mind
@@ -380,18 +381,20 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             )
             if mind_result.fragments:
                 mind_fragments = [f.title for f in mind_result.fragments[:4]]
+                best = mind_result.fragments[0]
+                mind_candidate = best.title
                 for ft in mind_fragments[:2]:
                     self._append_consciousness([f"memoria: {ft[:60]}"])
-            # Se dialogo insegnato è brevissimo E MIND ha contesto ricco →
-            # libera il compositore a generare risposta variabile (non il titolo fisso)
-            if dialogue_text and mind_fragments:
+            # Dialogo insegnato lungo prende priorità su MIND
+            # Dialogo brevissimo (< 4 parole) → MIND offre risposta più ricca
+            if dialogue_text and mind_candidate:
                 _dt_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", dialogue_text.lower()) if len(w) > 2]
-                _mf_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_fragments[0].lower()) if len(w) > 2]
+                _mf_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_candidate.lower()) if len(w) > 2]
                 if len(_dt_w) < 4 and len(_mf_w) >= 6:
-                    dialogue_text = ""
+                    dialogue_text = ""  # MIND ha risposta più ricca
 
         unknown_words: list[str] = []
-        if heard and not has_path and not code_out and not mind_fragments:
+        if heard and not has_path and not code_out and not mind_candidate:
             unknown_words = self.self_learner.detect_unknown(
                 heard,
                 has_pathway=has_path,
@@ -681,6 +684,45 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
+        elif mind_candidate and wants_voice and not dialogue_text:
+            # MIND ha trovato un frammento rilevante — usalo come risposta se articolabile.
+            import re as _re_mc
+            _mc_words = _re_mc.findall(r"[a-zàèéìòù']+", mind_candidate.lower())
+            _mc_artic = sum(1 for w in _mc_words if len(w) > 2 and
+                            self.composer._articulable(w, min_exposure=0.25))
+            if _mc_artic >= max(3, len(_mc_words) // 2):
+                _mc = mind_candidate.strip()
+                if _mc and _mc[-1] not in ".?!":
+                    _mc += "."
+                _mc = _mc[0].upper() + _mc[1:]
+                _plan = self.speech.plan_from_text(_mc) if self.speech else None
+                composed = ComposedSpeech(
+                    text=_mc, kind="speech", from_thought=True,
+                    thought_used=thought.themes[:6] + mind_fragments[:2],
+                    motor_plan=_plan,
+                )
+            elif long_form:
+                composed = self.composer.long_form(
+                    thought=thought, motor=self.speech,
+                    heard=heard, memory_themes=mind_fragments[:4] + (memory_themes or []),
+                )
+            else:
+                # Fallback a produce() con contesto MIND
+                speech_mode = "speak" if heard else ws.mode
+                if speech_mode not in ("speak", "reflect", "flow"):
+                    speech_mode = "speak"
+                recent_flat = [w for s in self._recent_spokes[-6:]
+                               for w in s.replace(".", "").replace("?", "").split() if len(w) > 2]
+                conv_ctx = self.working_memory.context_words(limit=8)
+                enriched_memory = list(dict.fromkeys(mind_fragments[:4] + (memory_themes or []) + conv_ctx))[:16]
+                composed = self.composer.produce(
+                    thought=thought, motor=self.speech, mode=speech_mode,
+                    reflective=False, pathway_primed=bool(pathway_words),
+                    pathway_words=pathway_words, amygdala=self.amygdala,
+                    recent_words=recent_flat, heard=heard,
+                    memory_themes=enriched_memory, valence=affect_valence,
+                    dialogue_text="",
+                )
         elif dialogue_text and wants_voice:
             # Risposta dialogica appresa — usata DIRETTAMENTE per risposte lunghe (>= 5 parole).
             # Risposte brevi passano al percorso emergente (produce/long_form) con pathway_words.
