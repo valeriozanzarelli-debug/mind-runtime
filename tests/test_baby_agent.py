@@ -152,11 +152,14 @@ def test_glance_asks_on_novel_scene(baby_store):
     b._last_glance_sig = ""
     r = b.glance(image_gray=gray_b, image_w=64, image_h=64, min_interval_s=0)
     if r.get("moment"):
-        assert r["moment"]["spoke"]
+        assert not r["moment"]["spoke"]
+        assert r["moment"]["impulse"] in ("ask", "vocalize", "attend")
     else:
         b._last_glance_sig = ""
         r2 = b.glance(image_gray=gray_a, image_w=64, image_h=64, min_interval_s=0)
-        assert r2.get("moment") is None or r2["moment"]["spoke"]
+        assert r2.get("perceived") or r2.get("moment")
+        if r2.get("moment"):
+            assert not r2["moment"]["spoke"]
 
 
 def test_hear_stop_word_no_crash(baby_store):

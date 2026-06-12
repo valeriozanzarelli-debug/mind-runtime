@@ -279,3 +279,45 @@ class BabyLifecycleMixin:
         self.working_memory.clear()
         self._persist()
         return {**result, "episodes_consolidated": consolidated}
+
+    def enter_dormant(self) -> dict[str, Any]:
+        """Riposo — niente crescita né speech spontaneo."""
+        self._dormant = True
+        self.thought_generator.stop()
+        self._persist()
+        return {"dormant": True}
+
+    def wake(self) -> dict[str, Any]:
+        """Esce dal riposo — riprende il loop di pensiero interno."""
+        self._dormant = False
+        if self.org:
+            self._start_thought_loop()
+        self._persist()
+        return {"dormant": False, "awake": True}
+
+    def stabilize(self, *, aggressive: bool = True) -> dict[str, Any]:
+        """Sonno profondo — pota sinapsi, consolida training, blocca output casuale."""
+        org = self._ensure()
+        self._dormant = True
+        self.thought_generator.stop()
+        cfg = org.dna.pruning_config()
+        threshold = float(cfg.get("weak_synapse_threshold", 0.05))
+        keep = float(cfg.get("keep_percentage", 0.85))
+        if aggressive:
+            threshold = max(threshold, 0.07)
+            keep = min(keep, 0.82)
+        removed = org.brain.prune_weak_synapses(threshold=threshold, keep_percentage=keep)
+        consolidated = org.brain.consolidate_memory()
+        episodes = self.episodic_memory.consolidate_short_to_long()
+        self.working_memory.clear()
+        self._append_consciousness(["sonno · consolidamento sinapsi e memoria"])
+        self._persist()
+        return {
+            "dormant": True,
+            "stabilized": True,
+            "pruned_synapses": removed,
+            "synapses_after": org.brain.synapse_count,
+            "synapses_grown": org.brain.synapse_count - self._synapses_at_birth,
+            "episodes_consolidated": episodes,
+            **consolidated,
+        }

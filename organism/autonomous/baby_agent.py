@@ -148,8 +148,14 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self._last_ws: dict[str, Any] = {}
         self._recent_spokes: list[str] = []
         self._last_spoke_wall_t: float = 0.0
+        self._dormant: bool = False
         loaded = self.store.load(self)
         self._resume_meta = loaded if loaded.get("loaded") else None
+        if loaded.get("loaded") and self.org:
+            grown = self.org.brain.synapse_count - self._synapses_at_birth
+            if grown > 1500:
+                self._dormant = True
+                self.thought_generator.stop()
 
     def _apply_cognition_config(self) -> None:
         if not self.org:
@@ -174,6 +180,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             hypotheses=self.hypothesis_engine,
             curiosity_fn=lambda: self.curiosity.state.level,
             on_thought=self._on_spontaneous_thought,
+            mind=self.org.mind_bridge.mind,
         )
         self.thought_generator.start()
 
@@ -205,12 +212,9 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self._dialogue_log = self._dialogue_log[-120:]
 
     def _on_spontaneous_thought(self, themes: list[str]) -> None:
-        if not themes:
+        if not themes or self._dormant:
             return
-        line = f"pensiero spontaneo: {' '.join(themes[:6])}"
-        if self._consciousness_log and self._consciousness_log[-1] == line:
-            return
-        self._append_consciousness([line])
+        self.working_memory.push(themes[:6], heard="")
         img = self.visual_imagination.flash(
             features=self._last_visual_features,
             labels=themes[:4],
@@ -363,8 +367,28 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             if any(k in hl for k in ("programma", "codice", "scrivi", "python", "funzione")):
                 code_out = self.code.produce(heard) or None
 
+        # --- MIND spreading activation ---
+        # Interroga la memoria semantica italiana con il testo sentito.
+        # Se MIND attiva frammenti, i loro titoli diventano candidate_response
+        # e memory_themes per il compositore — bypassa il word soup.
+        mind_candidate: str = ""
+        mind_fragments: list[str] = []
+        if heard and not dialogue_text and not code_out:
+            from mind.types import Cue, CueKind
+            mind_result = org.mind_bridge.mind.think(
+                Cue(kind=CueKind.TEXT, value=heard.strip(), meta={"human": True})
+            )
+            if mind_result.fragments:
+                # Usa il frammento più rilevante come risposta candidata
+                best = mind_result.fragments[0]
+                mind_candidate = best.title
+                mind_fragments = [f.title for f in mind_result.fragments[:4]]
+                # Aggiungi simboli MIND al flusso di coscienza
+                for ft in mind_fragments[:2]:
+                    self._append_consciousness([f"memoria: {ft[:60]}"])
+
         unknown_words: list[str] = []
-        if heard and not has_path and not code_out:
+        if heard and not has_path and not code_out and not mind_candidate:
             unknown_words = self.self_learner.detect_unknown(
                 heard,
                 has_pathway=has_path,
@@ -400,6 +424,21 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         )
         if heard:
             self.composer.absorb(heard, boost=0.5)
+
+        # Topic threading: inietta le parole chiave dei frammenti MIND attivati
+        # nella working memory e nei temi del pensiero per coerenza multi-turno
+        if mind_fragments:
+            import re as _re_topic
+            topic_words: list[str] = []
+            for ft in mind_fragments[:3]:
+                for w in _re_topic.findall(r"[a-zàèéìòù]+", ft.lower()):
+                    if len(w) > 3 and w not in topic_words:
+                        topic_words.append(w)
+            if topic_words:
+                self.working_memory.activate(topic_words[:8], weight=0.7)
+                for w in topic_words[:4]:
+                    if w not in thought.themes:
+                        thought.themes.append(w)
 
         _code_noise = ("print", "def", "return", "range", "for", "else")
         thought.themes = [
@@ -582,17 +621,13 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             impulse=impulse,
             wants_voice=em.will_speak or thought.pressure > 0.1 or has_path,
         )
-        wants_voice = (
+        caregiver_spoke = bool((heard or "").strip())
+        wants_voice = caregiver_spoke and (
             pres.speaks
-            or em.will_speak
-            or thought.pressure > 0.1
             or has_path
+            or is_question(heard or "")
             or impulse in ("vocalize", "ask")
         )
-        if heard and heard.strip():
-            wants_voice = True
-        if is_question(heard or ""):
-            wants_voice = True
         if wants_voice and not pres.speaks:
             pres = self.presence.evaluate(
                 curiosity=self.curiosity.state.level,
@@ -642,6 +677,20 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         composed: ComposedSpeech
         if code_out:
             composed = ComposedSpeech(code_out, "code", False, thought.themes[:4])
+        elif mind_candidate and wants_voice and not dialogue_text:
+            # MIND spreading activation ha trovato un frammento rilevante.
+            # Usa il titolo del frammento come risposta — è già una frase italiana completa.
+            # Nessun word soup: il significato viene dalla rete semantica, non dai neuroni casuali.
+            _mc = mind_candidate.strip()
+            if _mc and _mc[-1] not in ".?!":
+                _mc += "."
+            _mc = _mc[0].upper() + _mc[1:]
+            _plan = self.speech.plan_from_text(_mc) if self.speech else None
+            composed = ComposedSpeech(
+                text=_mc, kind="speech", from_thought=True,
+                thought_used=thought.themes[:6] + mind_fragments[:2],
+                motor_plan=_plan,
+            )
         elif dialogue_text and wants_voice:
             # Risposta dialogica appresa — usata DIRETTAMENTE per risposte lunghe (>= 5 parole).
             # Risposte brevi passano al percorso emergente (produce/long_form) con pathway_words.
@@ -731,16 +780,6 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 valence=affect_valence,
                 dialogue_text=dialogue_text,
             )
-            if not composed.text and em.will_speak and not ask_mode:
-                plan = self.speech.utter_with_plan()
-                if plan.text and len(plan.text) > 4:
-                    composed = ComposedSpeech(
-                        plan.text,
-                        "speech",
-                        True,
-                        thought.themes[:4],
-                        plan,
-                    )
         else:
             composed = ComposedSpeech("", "speech", False, [])
 
@@ -866,13 +905,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         if spoke.strip():
             self.narrator.train_from_text(spoke, boost=0.05)
             self.hypothesis_engine.observe(supports=spoke[:60])
-        return self.speech_loop.self_hear(
-            org.brain,
-            self.speech,
-            heard_text=spoke,
-            plan=mp,
-            source="self",
-        )
+        return {
+            "deferred_self_hear": True,
+            "text": spoke,
+            "syllables_reinforced": bool(mp and mp.syllables),
+        }
 
     def brain_pulse_tick(self, *, persist: bool = False) -> dict[str, Any]:
         """Cervello ad onde — percepisce, pensa, sogna, riflette senza corpo."""
@@ -897,7 +934,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 self._last_dream_content = dream_st.content
                 self.composer.absorb(dream_st.content, boost=0.15)
 
-        if self.affect._pulse_count % 20 == 0:
+        if not self._dormant and self.affect._pulse_count % 20 == 0:
             wire_self_recurrence(org.brain)
 
         for n in list(org.brain.neurons.values())[::3]:
@@ -905,7 +942,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         if org.brain.plasticity and self.affect._pulse_count % 15 == 0:
             org.brain.plasticity.apply_hebbian(org.brain, org.brain.tick)
 
-        growth = self.brain_growth.maybe_grow(org.brain, pulses=self.affect._pulse_count)
+        growth = (
+            self.brain_growth.maybe_grow(org.brain, pulses=self.affect._pulse_count)
+            if not self._dormant
+            else {"skipped": "dormant"}
+        )
 
         self.self_model.update(
             org.brain,
@@ -1119,47 +1160,49 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             self._persist()
         return {"moment": moment.to_dict(), "stats": org.stats}
 
-    def flow(self) -> dict[str, Any]:
-        """Un passo di coscienza — senza loop forzato, solo quando invocato."""
-        return self.autonomous_tick()
+    def conscious_flow(
+        self,
+        *,
+        image_gray: list[int] | None = None,
+        image_b64: str | None = None,
+        image_w: int = 64,
+        image_h: int = 64,
+        color_rgb: dict[str, float] | None = None,
+        image_rgba: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Flusso continuo — percepisce e pensa in silenzio; parla solo se il caregiver parla."""
+        return self.perceive_vision(
+            image_gray=image_gray,
+            image_b64=image_b64,
+            image_w=image_w,
+            image_h=image_h,
+            color_rgb=color_rgb,
+            image_rgba=image_rgba,
+        )
+
+    def flow(
+        self,
+        *,
+        image_gray: list[int] | None = None,
+        image_b64: str | None = None,
+        image_w: int = 64,
+        image_h: int = 64,
+        color_rgb: dict[str, float] | None = None,
+        image_rgba: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Un passo di coscienza — percezione silenziosa, niente speech spontaneo."""
+        return self.conscious_flow(
+            image_gray=image_gray,
+            image_b64=image_b64,
+            image_w=image_w,
+            image_h=image_h,
+            color_rgb=color_rgb,
+            image_rgba=image_rgba,
+        )
 
     def autonomous_tick(self) -> dict[str, Any]:
-        org = self._ensure()
-        idle = time.time() - self._last_sense_t
-        self.curiosity.tick_idle(idle)
-        impulse = self._choose_impulse(org)
-        skey = self.curiosity.state.last_stimulus_key or "idle"
-        spoke, code_out, thought_d, ws_d, mood, understood, from_thought, plan, stream = self._act(
-            org, heard=None, impulse=impulse, long_form=False, skey=skey
-        )
-
-        moment = BabyMoment(
-            impulse=impulse,
-            spoke=spoke,
-            code=code_out or "",
-            understood=from_thought,
-            from_thought=from_thought,
-            self_heard=False,
-            speech_error={},
-            consciousness=ws_d,
-            consciousness_stream=stream,
-            self_state=self.self_model.state.to_dict(),
-            wave=self.waves.last.to_dict(),
-            dream=self.dream_engine.state.to_dict(),
-            emotion=self.affect.state.to_dict(),
-            social_tone={},
-            presence=self._last_presence,
-            thought=thought_d,
-            stimulus_key=skey,
-            curiosity=self.curiosity.state.to_dict(),
-            learned=from_thought,
-            brain=mood.to_dict(),
-            wanted_to_speak=mood.wants_voice and not spoke,
-            symbols=[f"AUTO:{impulse}", f"EMO:{self.affect.state.dominant}"]
-            + thought_d.get("symbols", [])[:4],
-        )
-        self._last_moment = moment
-        return {"moment": moment.to_dict(), "stats": org.stats}
+        """Alias del flusso silenzioso — niente balbettio autonomo."""
+        return self.conscious_flow()
 
 
 def normalize_dialogue_key(when: str) -> str:
