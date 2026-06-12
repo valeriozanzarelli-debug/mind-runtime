@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="__ORGANISM_BASE__/static/baby.css" />
 </head>
 <body>
+  <!-- Camera sempre attiva — Baby vede il mondo -->
   <div class="cam-layer" aria-hidden="true">
     <video id="cam" autoplay playsinline muted></video>
     <canvas id="frame-canvas" width="64" height="64" hidden></canvas>
@@ -41,7 +42,7 @@
       </div>
     </div>
 
-    <p id="voice-hint" class="voice-hint">tocca lo schermo per sentire la voce</p>
+    <p id="voice-hint" class="voice-hint"></p>
     <p id="speech-line" class="speech-line" hidden aria-live="polite"></p>
     <p id="thought-line" class="thought-line" hidden></p>
     <p id="status" class="status">sta caricando…</p>
@@ -57,19 +58,17 @@
     </details>
   </main>
 
+  <!-- Solo testo + microfono. Nessuna modalità separata — Baby è sempre attivo. -->
   <form id="chat-form" class="chat-bar" autocomplete="off">
-    <input id="chat-input" class="chat-input" type="text" enterkeyhint="send" placeholder="Scrivi a lui…" maxlength="280" />
+    <input id="chat-input" class="chat-input" type="text" enterkeyhint="send"
+           placeholder="Parlagli…" maxlength="280" autocomplete="off" />
     <button id="chat-send" class="chat-send" type="submit" aria-label="Invia">↑</button>
   </form>
 
   <div class="controls controls-mic">
-    <button id="btn-mic" class="hand-btn mic-btn mic-only" title="Tieni premuto per parlare">
+    <button id="btn-mic" class="hand-btn mic-btn" title="Microfono (tieni premuto)">
       <span class="hand-icon">🎤</span>
       <span class="hand-label">parla</span>
-    </button>
-    <button id="btn-train" class="hand-btn train-btn" title="Addestra Baby (vocabolario + dialoghi)">
-      <span class="hand-icon">📚</span>
-      <span class="hand-label">addestra</span>
     </button>
     <a href="__ORGANISM_BASE__/lab" class="small link lab-link">lab</a>
   </div>
