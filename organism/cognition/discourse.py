@@ -1,20 +1,26 @@
-"""Discorso maturo — frasi lunghe e coerenti, non balbettio."""
+"""Discorso maturo — frasi coerenti da temi semantici, non balbettio."""
 
 from __future__ import annotations
 
 import random
 from typing import Any
 
-
 _OPENERS = (
     "vedo", "noto", "riconosco", "penso", "credo", "sento", "capisco",
-    "osservo", "ricordo", "so",
+    "osservo", "ricordo", "so", "trovo", "mi chiedo",
 )
-_LINKS = ("e", "anche", "poi", "quindi", "perché", "mentre", "quando", "come")
+_LINKS = ("e", "anche", "poi", "quindi", "perché", "mentre", "quando", "come", "però", "ma")
 _CLOSERS = (
-    "è interessante", "mi colpisce", "lo imparo", "ha senso",
-    "mi piace capire", "continuo ad imparare",
+    "è interessante", "mi colpisce", "ha senso",
+    "mi piace capire", "continuo ad imparare", "vale la pena sapere",
 )
+
+# Parole troppo frequenti nel corpus che inquinano il discorso se non filtrate
+_HIGH_FREQ_NOISE = frozenset({
+    "imparo", "imparare", "cosa", "legno", "pezzo", "catasta", "falegname",
+    "corvo", "coniglio", "volpe", "lupo", "bambino",  # da corpus visivo/Esopo
+    "stai", "adesso", "quando", "come", "cosa", "molto",
+})
 
 
 def compose_discourse(
@@ -25,15 +31,19 @@ def compose_discourse(
     max_words: int = 18,
     heard: str = "",
 ) -> str:
-    """Assembla un periodo umano da temi lessicali."""
+    """Assembla un periodo umano da temi semantici.
+    
+    Filtra parole-rumore ad alta frequenza che inquinano il discorso.
+    Non prepend le parole ascoltate ai temi (causa echo/noise).
+    """
     r = rng or random.Random()
-    words = [w.lower().strip() for w in themes if w and len(w) > 2 and w.isalpha()]
+    words = [
+        w.lower().strip() for w in themes
+        if w and len(w) > 2 and w.isalpha() and w.lower().strip() not in _HIGH_FREQ_NOISE
+    ]
     if not words:
         return ""
     words = list(dict.fromkeys(words))[:10]
-    if heard:
-        hw = [w for w in heard.lower().split() if len(w) > 2]
-        words = list(dict.fromkeys(hw[:2] + words))
 
     opener = r.choice(_OPENERS)
     parts: list[str] = [opener]
@@ -41,7 +51,7 @@ def compose_discourse(
     i = 0
     while len(parts) < target and i < len(words) * 2:
         w = words[i % len(words)]
-        if len(parts) >= 2 and r.random() < 0.35:
+        if len(parts) >= 2 and r.random() < 0.3:
             parts.append(r.choice(_LINKS))
         parts.append(w)
         i += 1

@@ -528,6 +528,12 @@ def _make_handler(server: NurseryServer):
                 )
             if path == "/api/baby/sleep":
                 return _json(self, server._with_lock(server.baby.sleep_cycle))
+            if path == "/api/baby/squash-lexicon":
+                def _squash():
+                    n = server.baby.composer.lexicon.squash_overexposed()
+                    server.baby._persist()
+                    return {"ok": True, "squashed": n, "vocab": server.baby.composer.lexicon.count}
+                return _json(self, server._with_lock(_squash))
             if path == "/api/baby/stabilize":
                 return _json(
                     self,

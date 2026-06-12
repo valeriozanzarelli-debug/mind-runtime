@@ -562,6 +562,9 @@ class BabyTeachingMixin:
         if self._last_vision_hash:
             self.visual_binder.bind(self._last_vision_hash, f"{when} {say}")
         result = self.dialogue.teach(when, say, kind=kind)  # type: ignore[arg-type]
+        # Ripeti consolidate_at volte per raggiungere la soglia di consolidamento
+        for _ in range(self.dialogue.consolidate_at - 1):
+            self.dialogue.teach(when, say, kind=kind)  # type: ignore[arg-type]
         if result.get("learned"):
             from mind.types import Fragment
 
