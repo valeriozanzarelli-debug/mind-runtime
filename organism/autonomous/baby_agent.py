@@ -826,6 +826,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
 
         spoke = composed.text if composed.kind == "speech" else ""
         code = composed.text if composed.kind == "code" else ""
+        # Rimuovi eventuali artefatti "→" da vecchi frammenti MIND
+        if spoke and "→" in spoke:
+            spoke = spoke.split("→")[-1].strip()
+            if spoke and spoke[0].islower():
+                spoke = spoke[0].upper() + spoke[1:]
         spoke = self._anti_repeat_speech(
             spoke,
             org=org,

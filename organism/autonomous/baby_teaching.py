@@ -543,7 +543,7 @@ class BabyTeachingMixin:
         self.speech.hear(say, boost=1.0)
         self.composer.absorb(when, boost=0.8)
         self.composer.absorb(say, boost=1.2)
-        org.perceive({"text": f"{when} → {say}"})
+        org.perceive({"text": f"{when}. {say}"})  # niente frecce — solo testo naturale
         org.brain.propagate(steps=2)
         grown = self._wire_from_input(org, had_text=True, had_vision=False, teach=True)
         for w in list(self.self_learner.gaps()):
@@ -571,7 +571,7 @@ class BabyTeachingMixin:
             org.memory.add(
                 Fragment(
                     id=f"dialogue_{normalize_dialogue_key(when)}",
-                    title=f"{when} → {say}",
+                    title=say[:120],  # il titolo è la RISPOSTA, non "domanda → risposta"
                     weight=0.75,
                     sensation_id="dialogue",
                     hooks=when.lower().split()[:6],
