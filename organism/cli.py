@@ -46,6 +46,10 @@ def main() -> None:
     nursery.add_argument("--port", type=int, default=8765)
     nursery.add_argument("--browser", action="store_true")
 
+    tutor = sub.add_parser("tutor", help="Agente tutore — cresce Baby piano piano in locale")
+    tutor.add_argument("--interval", type=float, default=45.0, help="Secondi tra un passo e l'altro")
+    tutor.add_argument("--tick", action="store_true", help="Un solo passo e esci")
+
     sub.add_parser("sleep", help="Prune + consolidate")
 
     viz = sub.add_parser("brain", help="Visualize brain sample")
@@ -94,6 +98,25 @@ def main() -> None:
     elif args.cmd == "nursery":
         from organism.nursery.server import NurseryServer
         NurseryServer(args.host, args.port).start(open_browser=args.browser)
+    elif args.cmd == "tutor":
+        from organism.autonomous.baby_agent import BabyAgent
+        from organism.autonomous.baby_store import baby_state_path
+        from organism.tutor.tutor_agent import TutorAgent
+
+        agent = BabyAgent(store_path=str(baby_state_path()))
+        tutor_agent = TutorAgent(baby_fn=lambda: agent)
+        if args.tick:
+            print(json.dumps(tutor_agent.tick_once(), ensure_ascii=False, indent=2))
+        else:
+            tutor_agent.start(interval_s=args.interval)
+            print(f"Tutore avviato — intervallo {args.interval}s (Ctrl+C per fermare)")
+            try:
+                import time
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                tutor_agent.stop()
+                print("\nTutore fermato.")
     elif args.cmd == "sleep":
         org = OrganismRuntime.studio_assistant()
         print(json.dumps(org.sleep(), indent=2))
