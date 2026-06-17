@@ -15,6 +15,7 @@ from organism.autonomous.baby_agent import BabyAgent
 from organism.cognition.brain_pulse import BrainPulse
 from organism.nursery.nursery import Nursery
 from organism.nursery.phases import phases_dict
+from organism.tutor.tutor_agent import TutorAgent
 
 STATIC_DIR = Path(os.environ.get("ORGANISM_STATIC_DIR", Path(__file__).parent / "static"))
 
@@ -36,6 +37,7 @@ class NurseryServer:
         self.nursery = Nursery(seed=seed)
         self.baby = BabyAgent(seed=seed)
         self._lock = threading.Lock()
+        self.tutor = TutorAgent(baby_fn=lambda: self.baby, lock=self._lock)
         self._server: ThreadingHTTPServer | None = None
         interval = float(os.environ.get("ORGANISM_PULSE_INTERVAL", "1.2"))
         self._brain_pulse = BrainPulse(self._pulse_tick, interval_s=interval)
@@ -240,6 +242,15 @@ def _make_handler(server: NurseryServer):
                     self,
                     {"base_path": server.base_path, "public_url": server.public_url},
                 )
+            if path == "/api/tutor/state":
+                return _json(self, server.tutor.status_dict())
+            if path == "/api/tutor/log":
+                qs = parse_qs(urlparse(self.path).query)
+                try:
+                    n = min(200, max(1, int(qs.get("n", ["50"])[0])))
+                except (ValueError, IndexError):
+                    n = 50
+                return _json(self, {"ok": True, "log": server.tutor.recent_log(n)})
             if path == "/api/download":
                 from organism.nursery.download_info import download_info
 
@@ -630,6 +641,21 @@ def _make_handler(server: NurseryServer):
                         )
                     ),
                 )
+
+            if path == "/api/tutor/start":
+                interval = body.get("interval_s")
+                return _json(
+                    self,
+                    server.tutor.start(
+                        interval_s=float(interval) if interval is not None else None,
+                    ),
+                )
+            if path == "/api/tutor/pause":
+                return _json(self, server.tutor.pause())
+            if path == "/api/tutor/stop":
+                return _json(self, server.tutor.stop())
+            if path == "/api/tutor/tick":
+                return _json(self, server.tutor.tick_once())
 
             if path == "/api/birth":
                 return _json(self, server._with_lock(server.nursery.birth))
