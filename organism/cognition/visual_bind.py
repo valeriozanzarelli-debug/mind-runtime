@@ -35,6 +35,7 @@ class VisualBinder:
         self._object_trials: dict[str, int] = {}
         self._object_candidates: dict[str, dict[str, int]] = {}
         self._prototypes: dict[str, list[dict[str, Any]]] = {}
+        self._user_taught: set[str] = set()
 
     def bind(
         self,
@@ -45,6 +46,7 @@ class VisualBinder:
         features: dict[str, Any] | None = None,
         object_sig: str = "",
         object_name: str = "",
+        user_taught: bool = False,
     ) -> int:
         if not scene_sig or scene_sig == "empty" or not phrase.strip():
             return 0
@@ -59,6 +61,10 @@ class VisualBinder:
         osig = object_sig or scene_sig
         if object_name and osig:
             name = object_name.strip().lower()
+            if user_taught:
+                self._user_taught.add(name)
+                self._object_names[osig] = name
+                self._object_names[scene_sig] = name
             candidates = self._object_candidates.setdefault(osig, {})
             candidates[name] = candidates.get(name, 0) + 1
             self._object_trials[osig] = self._object_trials.get(osig, 0) + 1

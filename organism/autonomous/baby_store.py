@@ -96,6 +96,14 @@ class BabyStore:
             "face_binder": agent.face_binder.to_dict(),
             "self_learner": agent.self_learner.to_dict(),
             "self_model": agent.self_model.stats(),
+            "psyche": {"seeded": agent._semantic_seeded, "causal_links": len(agent.psyche.causal._links)},
+            "superego": agent.superego.to_dict(),
+            "semantic": agent.semantic.to_dict(),
+            "neurochemistry": agent.neurochemistry.to_dict(),
+            "endocrine": agent.endocrine.to_dict(),
+            "interoception": agent.interoception.to_dict(),
+            "body_schema": agent.body_schema.to_dict(),
+            "quantum_layer": agent.quantum_layer.to_dict(),
             "dream": agent.dream_engine.stats(),
             "waves": agent.waves.stats(),
             "tasks": agent.tasks.to_dict(),
@@ -128,6 +136,7 @@ class BabyStore:
             return {"loaded": False, "reason": "never born"}
 
         from organism.motor.emergent_speech import EmergentSpeechMotor
+        from organism.motor.motion import MotionModule
         from organism.runtime import OrganismRuntime
 
         agent.seed = int(payload.get("seed", agent.seed))
@@ -140,6 +149,7 @@ class BabyStore:
 
         agent.speech = EmergentSpeechMotor(agent.org.brain, seed=agent.seed)
         agent.composer.bind(agent.org.brain, agent.speech)
+        agent.motion = MotionModule(agent.org.brain)
         agent.teacher.load_dict(payload.get("teacher", {}))
         agent.dialogue.load_dict(payload.get("dialogue", {}))
         agent.code.tokens.load_dict(payload.get("code_tokens", {}))
@@ -181,6 +191,25 @@ class BabyStore:
         agent.face_binder.load_dict(payload.get("face_binder", {}))
         agent.self_learner.load_dict(payload.get("self_learner", {}))
         agent.self_model.load_dict(payload.get("self_model", {}))
+        if payload.get("superego"):
+            agent.superego.load_dict(payload["superego"])
+        if payload.get("neurochemistry"):
+            agent.neurochemistry.load_dict(payload["neurochemistry"])
+        if payload.get("endocrine"):
+            agent.endocrine.load_dict(payload["endocrine"])
+        if payload.get("interoception"):
+            agent.interoception.load_dict(payload["interoception"])
+        if payload.get("body_schema"):
+            agent.body_schema.load_dict(payload["body_schema"])
+        if payload.get("quantum_layer"):
+            agent.quantum_layer.load_dict(payload["quantum_layer"])
+        if payload.get("semantic"):
+            agent.semantic.load_dict(payload["semantic"])
+            agent._semantic_seeded = True
+        psyche_meta = payload.get("psyche", {})
+        if psyche_meta.get("seeded"):
+            agent.psyche.ensure_seeded()
+            agent._semantic_seeded = True
         agent.dream_engine.load_dict(payload.get("dream", {}))
         ws = payload.get("waves", {})
         agent.waves._tick = int(ws.get("tick", 0))

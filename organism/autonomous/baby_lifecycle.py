@@ -12,6 +12,7 @@ from organism.cognition.episodic_memory import EpisodicMemory
 from organism.cognition.linguistic_narrator import LinguisticNarrator
 from organism.motor.compose_speech import SpeechComposer
 from organism.motor.emergent_speech import EmergentSpeechMotor
+from organism.motor.motion import MotionModule
 from organism.cognition.visual_imagination import VisualImagination
 from organism.cognition.goal_stack import GoalStack
 from organism.cognition.hypothesis_reasoning import HypothesisEngine
@@ -37,6 +38,7 @@ class BabyLifecycleMixin:
         self.org = OrganismRuntime.baby(seed=self.seed)
         self.speech = EmergentSpeechMotor(self.org.brain, seed=self.seed)
         self.composer.bind(self.org.brain, self.speech)
+        self.motion = MotionModule(self.org.brain)
         self._apply_cognition_config()
         layer2 = self._bootstrap_layer2()
         self._synapses_at_birth = self.org.brain.synapse_count

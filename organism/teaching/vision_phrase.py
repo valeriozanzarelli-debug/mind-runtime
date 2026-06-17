@@ -73,6 +73,8 @@ def parse_vision_teaching(phrase: str) -> VisionTeachPhrase:
         return VisionTeachPhrase(object_name=obj, color=col, raw=raw, phrase=raw)
 
     tokens = [w for w in re.findall(r"[a-zàèéìòù']+", tl) if w not in _ARTICLES and w not in _STOP and len(w) > 2]
+    if len(tokens) == 1 and len(tokens[0]) >= 4:
+        return VisionTeachPhrase(object_name=tokens[0], raw=raw, phrase=raw)
     if not tokens:
         return VisionTeachPhrase(object_name="", raw=raw, phrase=raw)
     if not any(k in tl for k in ("quest", "vedo", "guarda", "è ", " e ")):
@@ -84,3 +86,14 @@ def parse_vision_teaching(phrase: str) -> VisionTeachPhrase:
             col = _norm_color(w)
             break
     return VisionTeachPhrase(object_name=obj, color=col, raw=raw, phrase=raw)
+
+
+def is_vision_naming_phrase(phrase: str) -> bool:
+    """True se la frase nomina un oggetto visivo (es. «valigia», «questa è una cassa»)."""
+    p = parse_vision_teaching(phrase)
+    if p.has_object:
+        return True
+    tl = phrase.strip().lower()
+    tokens = [w for w in re.findall(r"[a-zàèéìòù']+", tl) if w not in _ARTICLES and w not in _STOP]
+    return len(tokens) == 1 and len(tokens[0]) >= 4
+

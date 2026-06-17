@@ -17,6 +17,9 @@ class SelfState:
     stream: list[str] = field(default_factory=list)
     sense: str = "io"
     awake: bool = True
+    embodied: bool = False
+    body_mode: str = "idle"
+    interoception: str = "neutro"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -24,11 +27,14 @@ class SelfState:
             "stream": self.stream[:12],
             "sense": self.sense,
             "awake": self.awake,
+            "embodied": self.embodied,
+            "body_mode": self.body_mode,
+            "interoception": self.interoception,
         }
 
 
 class SelfModel:
-    """Continuità del sé — senza corpo, senza mondo esterno assunto."""
+    """Continuità del sé — schema corporeo virtuale + mondo percepito."""
 
     def __init__(self) -> None:
         self.state = SelfState()
@@ -46,6 +52,9 @@ class SelfModel:
         saw: str = "",
         heard: str = "",
         spoke: str = "",
+        body_mode: str = "",
+        interoception: str = "",
+        place_context: list[str] | None = None,
     ) -> SelfState:
         self._pulse_count += 1
         mem_act = _layer_mean(brain, "associative", "memory_consolidator")
@@ -61,6 +70,11 @@ class SelfModel:
             + 0.1 * (self._pulse_count / 200),
         )
         self.state.awake = wave.phase != "dream"
+        if body_mode:
+            self.state.embodied = True
+            self.state.body_mode = body_mode
+        if interoception:
+            self.state.interoception = interoception
 
         if spoke:
             self._episodes.append(f"espresse:{spoke[:40]}")
@@ -77,6 +91,12 @@ class SelfModel:
             stream.append(ep)
         if affect.label:
             stream.append(f"sentimento:{affect.label}")
+        if body_mode:
+            stream.append(f"corpo:{body_mode}")
+        if interoception and interoception != "neutro":
+            stream.append(f"interno:{interoception}")
+        for place in (place_context or [])[:2]:
+            stream.append(place)
         self.state.stream = stream
         return self.state
 
@@ -101,6 +121,9 @@ class SelfModel:
             stream=list(s.get("stream", [])),
             sense=str(s.get("sense", "io")),
             awake=bool(s.get("awake", True)),
+            embodied=bool(s.get("embodied", False)),
+            body_mode=str(s.get("body_mode", "idle")),
+            interoception=str(s.get("interoception", "neutro")),
         )
         raw_eps = data.get("episodes", [])
         if isinstance(raw_eps, list):

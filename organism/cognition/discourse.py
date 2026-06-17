@@ -75,3 +75,17 @@ def is_babble(text: str, *, min_words: int = 5) -> bool:
     if len(t) < 12:
         return True
     return False
+
+
+def semantic_overlap(a: str, b: str) -> float:
+    """Similarità lessicale Jaccard — per filtri superego e coerenza dialogo."""
+    import re
+
+    ta = {w for w in re.findall(r"[a-zàèéìòù']+", (a or "").lower()) if len(w) > 2}
+    tb = {w for w in re.findall(r"[a-zàèéìòù']+", (b or "").lower()) if len(w) > 2}
+    if not ta or not tb:
+        return 0.0
+    inter = len(ta & tb)
+    union = len(ta | tb)
+    return inter / union if union else 0.0
+

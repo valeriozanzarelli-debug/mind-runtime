@@ -15,6 +15,14 @@ _CONSONANTS = set("bcdfghjklmnpqrstvwxyz")
 EXPOSURE_SOFT_CAP = 80.0
 EXPOSURE_HARD_CAP = 120.0
 
+FILLER_WORDS = frozenset({
+    "e", "o", "a", "il", "lo", "la", "i", "gli", "le", "un", "una", "uno",
+    "che", "di", "da", "in", "con", "su", "per", "non", "mi", "ti", "si",
+    "è", "sono", "ho", "hai", "ha", "c", "l", "d", "questo", "questa", "quello",
+    "cosa", "come", "quando", "dove", "perché", "perche", "molto", "poco", "bene",
+    "allora", "anche", "ancora", "solo", "già", "gia", "poi", "qui", "lì", "li",
+})
+
 
 def _tokens(text: str) -> list[str]:
     return [w for w in _TOKEN_RE.findall(text.lower()) if len(w) >= 2]

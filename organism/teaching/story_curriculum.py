@@ -58,3 +58,23 @@ def long_story_chunks(*, max_words: int = 45) -> list[str]:
 
 def dialogue_chains() -> list[tuple[str, str]]:
     return list(_DIALOGUE_CHAINS)
+
+
+def pinocchio_semantic_lessons() -> dict[str, list]:
+    """Lessico e beat Pinocchio per PsycheEngine / test comprensione."""
+    return {
+        "words": [
+            ("pinocchio", "burattino di legno che vuole diventare bambino vero", ["legno", "geppetto"]),
+            ("legno", "materiale duro da cui si fanno oggetti e burattini", ["albero", "falegname"]),
+            ("geppetto", "falegname che creò pinocchio", ["pinocchio", "bottega"]),
+            ("formaggio", "cibo morbido e nutriente", ["topo", "cibo"]),
+            ("corvo", "uccello nero che parla nella storia", ["consiglio", "volpe"]),
+            ("volpe", "animale astuto che inganna pinocchio", ["corvo", "lupo"]),
+        ],
+        "beats": [
+            (1, "Geppetto scolpisce un pezzo di legno e nasce Pinocchio.", ["geppetto", "pinocchio", "legno"], ["chi è pinocchio"]),
+            (2, "Pinocchio incontra la Volpe e il Gatto.", ["pinocchio", "volpe"], ["continua pinocchio"]),
+            (3, "Pinocchio impara che dire bugie allunga il naso.", ["pinocchio"], ["cosa insegna pinocchio"]),
+        ],
+    }
+

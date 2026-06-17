@@ -57,7 +57,17 @@ from organism.cognition.linguistic_narrator import LinguisticNarrator
 from organism.cognition.visual_imagination import VisualImagination
 from organism.cognition.goal_stack import GoalStack
 from organism.cognition.hypothesis_reasoning import HypothesisEngine
+from organism.cognition.comprehension import PsycheEngine, ComprehensionFrame
+from organism.cognition.superego import SuperegoEngine
+from organism.cognition.neurochemistry import NeurochemistryEngine
+from organism.cognition.endocrine import EndocrineSystem
+from organism.cognition.interoception import InteroceptionEngine
+from organism.cognition.spatial_body import VirtualBodySchema
+from organism.brain.quantum_microtubules import QuantumMicrotubuleLayer
+from organism.teaching.semantic_knowledge import SemanticKnowledge
+from organism.motor.motion import MotionModule, MotionResult
 from organism.autonomous.thought_generator import ThoughtGenerator
+from datetime import datetime
 from organism.sensory.vision_sense import VisionSense
 from organism.cognition.human_thought import (
     compose_inner_voice,
@@ -124,6 +134,18 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self.visual_imagination = VisualImagination(self.photo_memory)
         self.goal_stack = GoalStack()
         self.hypothesis_engine = HypothesisEngine()
+        self.psyche = PsycheEngine()
+        self.superego = SuperegoEngine()
+        self.semantic = SemanticKnowledge()
+        self._semantic_seeded = False
+        self.neurochemistry = NeurochemistryEngine()
+        self.endocrine = EndocrineSystem()
+        self.interoception = InteroceptionEngine()
+        self.body_schema = VirtualBodySchema()
+        self.quantum_layer = QuantumMicrotubuleLayer()
+        self.motion: MotionModule | None = None
+        self._last_motion: MotionResult | None = None
+        self._last_comp_frame: ComprehensionFrame | None = None
         self.thought_generator = ThoughtGenerator(seed=seed)
         self.vision_sense = VisionSense()
         self.dna_evolver = DNAEvolver.load()
@@ -163,6 +185,128 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             if grown > 1500:
                 self._dormant = True
                 self.thought_generator.stop()
+
+    def _dialogue_for_psyche(self, heard: str) -> tuple[str | None, str | None, bool]:
+        say, kind = self.dialogue.respond(heard)
+        verbatim = bool(say and kind in ("speech", "code"))
+        return say, kind, verbatim
+
+    def _ensure_semantic(self) -> None:
+        if self._semantic_seeded:
+            return
+        from organism.teaching.story_curriculum import pinocchio_semantic_lessons
+
+        lessons = pinocchio_semantic_lessons()
+        for word, definition, related in lessons.get("words", []):
+            self.semantic.teach_word(word, definition, related=related, story_id="pinocchio")
+        for order, summary, entities, hooks in lessons.get("beats", []):
+            self.semantic.teach_beat("pinocchio", order, summary, entities=entities, hooks=hooks)
+        for pair in self.dialogue.all_pairs():
+            when = str(pair.get("when", ""))
+            say = str(pair.get("say", ""))
+            if when and say and len(say.split()) <= 6:
+                for w in _tokens_from_heard(when):
+                    if len(w) > 3 and not self.semantic.is_grounded(w):
+                        self.semantic.teach_word(w, say[:80], related=[when], story_id="dialogue")
+        self._semantic_seeded = True
+
+    def _tick_subcortex(
+        self,
+        org: OrganismRuntime,
+        *,
+        idle_s: float = 0.0,
+        social_warm: bool = False,
+        learned: bool = False,
+        wave_phase: str = "think",
+    ) -> None:
+        """Ghiandole, neurotrasmettitori, interocezione — ogni ciclo cognitivo."""
+        aff = self.affect.state
+        stress = self.endocrine.stress_from_affect(
+            fear=aff.fear, anger=aff.anger, shame=aff.shame
+        )
+        hour = datetime.now(TZ).hour
+        self.neurochemistry.tick(
+            joy=aff.joy,
+            fear=aff.fear,
+            anger=aff.anger,
+            trust=aff.trust,
+            curiosity=aff.curiosity,
+            stress=stress,
+            social_warm=social_warm,
+            idle_s=idle_s,
+            learned=learned,
+        )
+        self.endocrine.tick(
+            hour=hour,
+            wave_phase=wave_phase,
+            stress=stress,
+            social_bond=aff.trust,
+            fatigue=self.interoception.state.fatigue,
+        )
+        j, f, sa, an, tr, cu = self.neurochemistry.modulate_affect_dims(
+            joy=aff.joy,
+            fear=aff.fear,
+            sadness=aff.sadness,
+            anger=aff.anger,
+            trust=aff.trust,
+            curiosity=aff.curiosity,
+        )
+        aff.joy, aff.fear, aff.sadness = j, f, sa
+        aff.anger, aff.trust, aff.curiosity = an, tr, cu
+        self.affect._set_dominant()
+        self.neurochemistry.inject_into_brain(org.brain)
+        self.interoception.update(
+            self.neurochemistry.state,
+            self.endocrine.hormones,
+            joy=aff.joy,
+            fear=aff.fear,
+            shame=aff.shame,
+            idle_s=idle_s,
+        )
+
+    def _update_body_schema(self) -> None:
+        features = self._last_visual_features or {}
+        flow = float(features.get("motion", 0.0))
+        bearing = self.body_schema.salient_bearing_from_features(features)
+        gesture_hint = self.body_schema.gesture_from_state(
+            joy=self.affect.state.joy,
+            fear=self.affect.state.fear,
+        )
+        self.body_schema.tick(
+            optical_flow=flow,
+            flow_direction=0.0,
+            salient_bearing=bearing,
+            curiosity=self.affect.state.curiosity,
+            fear=self.affect.state.fear,
+            motion_gesture=gesture_hint,
+        )
+
+    def _apply_superego(self, spoke: str, heard: str, frame: ComprehensionFrame | None) -> str:
+        if not spoke.strip():
+            return spoke
+        self._ensure_semantic()
+        verdict = self.superego.review(
+            spoke,
+            heard=heard,
+            frame=frame,
+            semantic=self.semantic,
+            articulable=lambda w: self.composer.lexicon.is_articulable(w, min_exposure=0.25),
+        )
+        if verdict.action == "allow":
+            return spoke
+        text = verdict.text or spoke
+        if (
+            frame
+            and frame.intent == "social"
+            and frame.inhibit_lexicon_dump
+            and text.strip().lower().rstrip(".") == (frame.taught_say or "").strip().lower().rstrip(".")
+        ):
+            text = "ciao, ti ascolto. dimmi pure."
+        if verdict.action == "substitute" and text:
+            return text
+        if verdict.action == "block":
+            return text or ""
+        return spoke
 
     def _apply_cognition_config(self) -> None:
         if not self.org:
@@ -357,6 +501,20 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         sensory_symbols: list[str] | None = None,
         social_tone: SocialTone | None = None,
     ) -> tuple[str, str, dict, dict, BrainMood, bool, bool, MotorPlan | None, list[str]]:
+        idle_s = time.time() - self._last_sense_t
+        wave_phase = self.waves.last.phase
+        tone_pre = social_tone or SocialTone(0.0, 0.1, False, False, False, False)
+        self._tick_subcortex(
+            org,
+            idle_s=idle_s,
+            social_warm=tone_pre.is_warm or tone_pre.is_praise,
+            wave_phase=wave_phase,
+        )
+        if self._vision_fresh:
+            self._update_body_schema()
+        if self.motion is None and org.brain:
+            self.motion = MotionModule(org.brain)
+
         arousal = inject_circadian(org.brain)
         if impulse == "vocalize":
             for n in self.speech.phoneme_neurons[:6]:
@@ -364,11 +522,32 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         org.brain.propagate(steps=1)
 
         grown = org.brain.synapse_count - self._synapses_at_birth
-        wave_phase = self.waves.last.phase
         vis_themes = self._visual_themes()
         has_path, code_out, pathway_words, dialogue_text = self._prime_learned_pathways(
             org, skey, heard, vision_fresh=self._vision_fresh
         )
+        comp_frame: ComprehensionFrame | None = None
+        if heard:
+            self._ensure_semantic()
+            comp_frame = self.psyche.comprehend(
+                heard,
+                semantic=self.semantic,
+                dialogue_respond=self._dialogue_for_psyche,
+                episodic_recall=self.episodic_memory.recall_context,
+                wm_context=self.working_memory.context_words(),
+                visual_themes=vis_themes,
+            )
+            self._last_comp_frame = comp_frame
+            if comp_frame.taught_say and comp_frame.intent in ("taught", "causal", "word_meaning"):
+                if not dialogue_text or comp_frame.depth >= 0.65:
+                    dialogue_text = comp_frame.taught_say
+            if comp_frame.inhibit_lexicon_dump and comp_frame.intent == "social":
+                dialogue_text = ""
+                pathway_words = _tokens_from_heard((heard or "").lower())
+            if comp_frame.inhibit_shallow and comp_frame.intent.startswith("narrative"):
+                long_form = True
+
+        vis_cue = self._last_vision_hash if self._vision_fresh else ""
         if not code_out and heard:
             hl = heard.lower()
             if any(k in hl for k in ("programma", "codice", "scrivi", "python", "funzione")):
@@ -399,6 +578,10 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 _mf_w = [w for w in _re_mind.findall(r"[a-zàèéìòù']+", mind_candidate.lower()) if len(w) > 2]
                 if len(_dt_w) < 4 and len(_mf_w) >= 6:
                     dialogue_text = ""  # MIND ha risposta più ricca
+            if comp_frame and comp_frame.inhibit_lexicon_dump and comp_frame.intent == "social":
+                taught = (comp_frame.taught_say or "").strip().lower().rstrip(".")
+                if mind_candidate.strip().lower().rstrip(".") == taught:
+                    mind_candidate = ""
 
         unknown_words: list[str] = []
         if heard and not has_path and not code_out and not mind_candidate:
@@ -432,6 +615,15 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             ws = merge_workspace(ws, self.impulse)
             for line in impulse_consciousness_lines(self.impulse):
                 self._append_consciousness([line])
+        layers = org.brain.layer_activation_summary()
+        neural_act = sum(layers.values()) / max(1, len(layers))
+        qstate = self.quantum_layer.tick(
+            neural_activity=neural_act,
+            workspace_ignition=ws.ignition,
+            thought_seed=(heard or ws.focus or "")[:80],
+        )
+        if qstate.last_moment and self.quantum_layer.collapse_boost() > 0.05:
+            self._append_consciousness([f"microtubuli · {qstate.last_moment[:56]}"])
         thought = self.thought_engine.think(
             org.brain,
             org.memory,
@@ -845,6 +1037,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             spoke = spoke.split("→")[-1].strip()
             if spoke and spoke[0].islower():
                 spoke = spoke[0].upper() + spoke[1:]
+        spoke = self._apply_superego(spoke, heard or "", comp_frame)
         spoke = self._anti_repeat_speech(
             spoke,
             org=org,
@@ -866,6 +1059,23 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         if spoke and not plan:
             plan = self.speech.plan_from_text(spoke)
         motor_fb: dict[str, Any] = {}
+        motion_fb: dict[str, Any] = {}
+        if self.motion:
+            pose_d = self.body_schema.pose.to_dict()
+            self._last_motion = self.motion.express(
+                spatial_gesture=self.body_schema.gesture_from_state(
+                    joy=self.affect.state.joy,
+                    fear=self.affect.state.fear,
+                ),
+                heading_deg=float(pose_d.get("heading_deg", 0.0)),
+                velocity=float(pose_d.get("velocity", 0.0)),
+                body_mode=self.body_schema.navigate_mode,
+            )
+            motion_fb = {
+                "gesture": self._last_motion.frames[0].gesture if self._last_motion.frames else "",
+                "mode": self.body_schema.navigate_mode,
+                "pose": pose_d,
+            }
         if spoke:
             self._last_baby_spoke = spoke
             self._last_spoke_wall_t = time.time()
@@ -931,6 +1141,8 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self._append_consciousness(stream)
         if motor_fb:
             thought_d.setdefault("motor_loop", motor_fb)
+        if motion_fb:
+            thought_d.setdefault("body_motion", motion_fb)
         return spoke, code, thought_d, ws_d, mood, understood, composed.from_thought, plan, stream
 
     def _close_motor_loop(
@@ -978,6 +1190,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
 
         wave = self.waves.advance(idle=idle > 10, arousal=self.affect.state.curiosity)
         inject_wave(org.brain, wave.phase, tick=wave.tick, amplitude=wave.amplitude)
+        self._tick_subcortex(org, idle_s=idle, wave_phase=wave.phase)
         self.affect.pulse_tick(org.brain, idle=idle > 25)
         self._pulse_amygdala(org)
 
@@ -1011,6 +1224,9 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             affect=self.affect.state,
             dream_fragment=dream_st.content if dream_st.active else "",
             saw=self._last_vision_hash,
+            body_mode=self.body_schema.navigate_mode,
+            interoception=self.interoception.state.label,
+            place_context=self.body_schema.hippocampus_context(),
         )
 
         if persist:
@@ -1022,6 +1238,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             "self": self.self_model.state.to_dict(),
             "dream": dream_st.to_dict(),
             "emotion": self.affect.state.to_dict(),
+            "neurochemistry": self.neurochemistry.stats(),
+            "endocrine": self.endocrine.stats(),
+            "interoception": self.interoception.stats(),
+            "body_schema": self.body_schema.stats(),
+            "quantum": self.quantum_layer.stats(),
             "pulses": self.affect._pulse_count,
             "idle_s": round(idle, 1),
             "growth": growth,
