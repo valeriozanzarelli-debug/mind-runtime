@@ -6,6 +6,7 @@ Compatibile CPU (test/CI) e Numba CUDA (RTX 1060 locale).
 from __future__ import annotations
 
 import math
+import os
 from typing import Any
 
 import numpy as np
@@ -28,6 +29,18 @@ from mindruntime.field_v2 import (
     PI,
     TWO_PI,
 )
+
+HH_SUBSTEPS = int(os.environ.get("ORGANISM_HH_SUBSTEPS", "1"))
+
+try:
+    from mindruntime import gpu_physics_v2_cuda_optimized as _cuda_opt
+except ImportError:  # pragma: no cover
+    _cuda_opt = None  # type: ignore
+
+
+def _use_cuda_opt() -> bool:
+    return _cuda_opt is not None and _cuda_opt.optimized_available()
+
 
 if HAS_NUMBA:
     from numba import cuda, float32, int32
@@ -348,13 +361,14 @@ def _dV_dt(V: float, m: float, h: float, n: float, I_ext: float) -> float:
     return (I_Na + I_K + I_L + I_ext) / C_M
 
 
-def hh_rk4_step_field(field: np.ndarray, dt: float = HH_DT) -> None:
+def hh_rk4_step_field(field: np.ndarray, dt: float = HH_DT, *, defer_sync: bool = False) -> None:
     h, w = field.shape[:2]
     field = np.ascontiguousarray(field)
     if HAS_CUDA and cuda is not None:
         blocks, threads = _cuda_grid(h, w)
         _hh_rk4_cuda[blocks, threads](field, float32(dt))
-        cuda.synchronize()
+        if not defer_sync:
+            cuda.synchronize()
         return
     for y in range(h):
         for x in range(w):
@@ -444,14 +458,26 @@ def initialize_field_v2(rgb: np.ndarray, field: np.ndarray, *, seed: int = 42, t
             field[y, x, CH_N] = an / (an + beta_n(V) + 1e-9)
 
 
-def turing_reaction_diffusion(field_in: np.ndarray, field_out: np.ndarray, *, decay: float = 0.97) -> None:
+def turing_reaction_diffusion(
+    field_in: np.ndarray,
+    field_out: np.ndarray,
+    *,
+    decay: float = 0.97,
+    defer_sync: bool = False,
+) -> None:
     h, w = field_in.shape[:2]
     field_in = np.ascontiguousarray(field_in)
     field_out = np.ascontiguousarray(field_out)
+    if _use_cuda_opt():
+        _cuda_opt.launch_turing(field_in, field_out, decay)
+        if not defer_sync:
+            _cuda_opt.cuda_sync()
+        return
     if HAS_CUDA and cuda is not None:
         blocks, threads = _cuda_grid(h, w)
         _turing_rd_cuda[blocks, threads](field_in, field_out, float32(decay))
-        cuda.synchronize()
+        if not defer_sync:
+            cuda.synchronize()
         return
     for y in range(h):
         for x in range(w):
@@ -489,13 +515,19 @@ def turing_reaction_diffusion(field_in: np.ndarray, field_out: np.ndarray, *, de
                 field_out[y, x, ch] = field_in[y, x, ch]
 
 
-def soc_avalanche(field: np.ndarray, *, target: int = 10) -> None:
+def soc_avalanche(field: np.ndarray, *, target: int = 10, defer_sync: bool = False) -> None:
     h, w = field.shape[:2]
     field = np.ascontiguousarray(field)
+    if _use_cuda_opt():
+        _cuda_opt.launch_soc(field, target)
+        if not defer_sync:
+            _cuda_opt.cuda_sync()
+        return
     if HAS_CUDA and cuda is not None:
         blocks, threads = _cuda_grid(h, w)
         _soc_cuda[blocks, threads](field, int32(target))
-        cuda.synchronize()
+        if not defer_sync:
+            cuda.synchronize()
         return
     radius = 5
     for y in range(h):
@@ -514,13 +546,19 @@ def soc_avalanche(field: np.ndarray, *, target: int = 10) -> None:
             field[y, x, CH_W] = np.clip(wv, 0.1, 1.0)
 
 
-def gamma_phase_lock(field: np.ndarray, *, threshold: float = 0.65) -> None:
+def gamma_phase_lock(field: np.ndarray, *, threshold: float = 0.65, defer_sync: bool = False) -> None:
     h, w = field.shape[:2]
     field = np.ascontiguousarray(field)
+    if _use_cuda_opt():
+        _cuda_opt.launch_gamma(field, threshold)
+        if not defer_sync:
+            _cuda_opt.cuda_sync()
+        return
     if HAS_CUDA and cuda is not None:
         blocks, threads = _cuda_grid(h, w)
         _gamma_lock_cuda[blocks, threads](field, float32(threshold))
-        cuda.synchronize()
+        if not defer_sync:
+            cuda.synchronize()
         return
     radius = 3
     for y in range(h):
@@ -550,15 +588,27 @@ def gamma_phase_lock(field: np.ndarray, *, threshold: float = 0.65) -> None:
             field[y, x, CH_COH] = np.clip(coh, 0, 1)
 
 
-def predictive_coding(field: np.ndarray, spike_time: np.ndarray, tick: float, *, noise: float = 0.02) -> float:
+def predictive_coding(
+    field: np.ndarray,
+    spike_time: np.ndarray,
+    tick: float,
+    *,
+    noise: float = 0.02,
+    defer_sync: bool = False,
+) -> float:
     """Ritorna free energy media."""
     h, w = field.shape[:2]
     field = np.ascontiguousarray(field)
     spike_time = np.ascontiguousarray(spike_time)
-    if HAS_CUDA and cuda is not None:
+    if _use_cuda_opt():
+        _cuda_opt.launch_predictive(field, spike_time, tick, noise)
+        if not defer_sync:
+            _cuda_opt.cuda_sync()
+    elif HAS_CUDA and cuda is not None:
         blocks, threads = _cuda_grid(h, w)
         _predictive_cuda[blocks, threads](field, spike_time, float32(tick), float32(noise))
-        cuda.synchronize()
+        if not defer_sync:
+            cuda.synchronize()
     else:
         for y in range(h):
             for x in range(w):
@@ -605,6 +655,10 @@ def kuramoto_global(phase: np.ndarray) -> float:
 
 
 def inject_rgb(field: np.ndarray, rgb: np.ndarray, *, gain: float = 0.35) -> None:
+    if _use_cuda_opt():
+        _cuda_opt.launch_inject_rgb(field, rgb, gain)
+        _cuda_opt.cuda_sync()
+        return
     if rgb.max() > 1.5:
         rgb = rgb.astype(np.float32) / 255.0
     h, w = field.shape[:2]
@@ -625,14 +679,17 @@ def physics_step_v2(
     *,
     do_soc: bool,
 ) -> dict[str, float]:
-    for _ in range(2):
-        hh_rk4_step_field(field)
-    turing_reaction_diffusion(field, scratch)
+    batched = _use_cuda_opt()
+    for _ in range(HH_SUBSTEPS):
+        hh_rk4_step_field(field, defer_sync=batched)
+    turing_reaction_diffusion(field, scratch, defer_sync=batched)
     field[:] = scratch
     if do_soc:
-        soc_avalanche(field)
-    gamma_phase_lock(field)
-    fe = predictive_coding(field, spike_time, tick)
+        soc_avalanche(field, defer_sync=batched)
+    gamma_phase_lock(field, defer_sync=batched)
+    fe = predictive_coding(field, spike_time, tick, defer_sync=batched)
+    if batched and _cuda_opt is not None:
+        _cuda_opt.cuda_sync()
     R = kuramoto_global(field[:, :, CH_PH])
     return {"order": R, "free_energy": fe, "mean_coherence": float(field[:, :, CH_COH].mean())}
 
