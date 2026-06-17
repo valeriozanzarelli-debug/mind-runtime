@@ -16,7 +16,7 @@ from organism.cognition.brain_pulse import BrainPulse
 from organism.nursery.nursery import Nursery
 from organism.nursery.phases import phases_dict
 
-STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR = Path(os.environ.get("ORGANISM_STATIC_DIR", Path(__file__).parent / "static"))
 
 
 class NurseryServer:
@@ -144,6 +144,8 @@ def _make_handler(server: NurseryServer):
             path = self._route_path()
             if path in ("/", "/baby", "/baby.html"):
                 return _serve_baby_html(self, server.base_path)
+            if path in ("/download", "/download.html"):
+                return _serve_download_html(self, server.base_path)
             if path in ("/lab", "/index.html"):
                 return _serve_file(self, STATIC_DIR / "index.html")
             if path.startswith("/static/"):
@@ -202,6 +204,10 @@ def _make_handler(server: NurseryServer):
                     self,
                     {"base_path": server.base_path, "public_url": server.public_url},
                 )
+            if path == "/api/download":
+                from organism.nursery.download_info import download_info
+
+                return _json(self, download_info(base_path=server.base_path))
             if path == "/api/state":
                 return _json(self, server._with_lock(server.nursery.state))
             if path == "/api/phases":
@@ -622,6 +628,23 @@ def _make_handler(server: NurseryServer):
     return Handler
 
 
+def _serve_download_html(handler: BaseHTTPRequestHandler, base_path: str) -> None:
+    raw = (STATIC_DIR / "download.html").read_text(encoding="utf-8")
+    raw = raw.replace("__ORGANISM_BASE__", base_path)
+    js_path = STATIC_DIR / "download.js"
+    js_ver = int(js_path.stat().st_mtime) if js_path.exists() else 0
+    raw = raw.replace("download.js", f"download.js?v={js_ver}")
+    css_path = STATIC_DIR / "download.css"
+    css_ver = int(css_path.stat().st_mtime) if css_path.exists() else 0
+    raw = raw.replace("download.css", f"download.css?v={css_ver}")
+    content = raw.encode("utf-8")
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Content-Length", str(len(content)))
+    handler.end_headers()
+    handler.wfile.write(content)
+
+
 def _serve_baby_html(handler: BaseHTTPRequestHandler, base_path: str) -> None:
     raw = (STATIC_DIR / "baby.html").read_text(encoding="utf-8")
     js_path = STATIC_DIR / "baby.js"
@@ -648,6 +671,11 @@ def _serve_file(handler: BaseHTTPRequestHandler, path: Path) -> None:
     handler.send_response(200)
     handler.send_header("Content-Type", ctype)
     handler.send_header("Content-Length", str(len(content)))
+    if path.suffix.lower() == ".exe":
+        handler.send_header(
+            "Content-Disposition",
+            f'attachment; filename="{path.name}"',
+        )
     handler.end_headers()
     handler.wfile.write(content)
 

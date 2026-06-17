@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ORGANISM — Download Windows</title>
+  <script>window.ORGANISM_BASE = "__ORGANISM_BASE__";</script>
+  <link rel="stylesheet" href="__ORGANISM_BASE__/static/download.css" />
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+  <header>
+    <a href="__ORGANISM_BASE__/" class="back">← Baby</a>
+    <h1>🧬 ORGANISM</h1>
+    <p class="tagline">Installa Baby sul tuo PC Windows — locale, con webcam e microfono</p>
+  </header>
+
+  <main class="card">
+    <div class="version-line">
+      versione <strong id="ver">—</strong> · Windows <span id="min-win">10+</span>
+    </div>
+
+    <a id="btn-download" class="btn-download" href="#" download>
+      <span class="btn-title">Scarica ORGANISM</span>
+      <span class="btn-sub" id="btn-sub">ORGANISM-Windows.exe</span>
+    </a>
+
+    <p id="size-line" class="meta"></p>
+    <p id="status-line" class="status"></p>
+
+    <section class="steps">
+      <h2>Come funziona</h2>
+      <ol>
+        <li>Scarica <code>ORGANISM-Windows.exe</code></li>
+        <li>Doppio clic — Windows potrebbe chiedere “Esegui comunque”</li>
+        <li>Si apre il browser su <code>http://127.0.0.1:8765</code></li>
+        <li>Consenti <strong>webcam</strong> e <strong>microfono</strong></li>
+        <li>Baby nasce, vede, sente, impara</li>
+      </ol>
+    </section>
+
+    <section class="notes">
+      <h3>Dove salva i dati</h3>
+      <p><code>%USERPROFILE%\.organism\baby_state.json</code> — memoria tra sessioni.</p>
+      <h3>GPU (opzionale)</h3>
+      <p>Per la retina neurale HD serve NVIDIA + driver aggiornati. Senza GPU funziona comunque in CPU.</p>
+      <h3>Alternativa sviluppatori</h3>
+      <p>
+        <a id="github-link" href="https://github.com/valeriozanzarelli-debug/mind-runtime" target="_blank" rel="noopener">
+          GitHub · sorgente
+        </a>
+      </p>
+    </section>
+  </main>
+
+  <footer>
+  <a href="__ORGANISM_BASE__/lab">Lab tecnico</a> ·
+  <a href="https://inkconscius.eu/organism/">inkconscius.eu/organism</a>
+  </footer>
+  <script src="__ORGANISM_BASE__/static/download.js"></script>
+</body>
+</html>
