@@ -98,6 +98,9 @@ class BabyStateMixin:
                 if getattr(self, "brain_orchestrator", None)
                 else None
             ),
+            "body_schema": self.body_schema.stats(),
+            "emotion": self.affect.state.to_dict(),
+            "waves": self.waves.stats(),
         }
 
     def state(self) -> dict[str, Any]:

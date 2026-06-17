@@ -36,8 +36,20 @@ class HybridImpulseScaffold:
             self._mode = "remote"
 
     @property
+    def field(self):
+        """Campo locale — sempre disponibile per visualizzazione/API."""
+        return self._ensure_local().field
+
+    @property
     def last_reading(self):
         return self._active().last_reading
+
+    def energy_bytes(self) -> bytes:
+        return self._ensure_local().energy_bytes()
+
+    def phase_bytes(self) -> bytes | None:
+        fn = getattr(self._ensure_local(), "phase_bytes", None)
+        return fn() if callable(fn) else None
 
     def _active(self) -> Any:
         if self._mode == "remote" and self._remote is not None:

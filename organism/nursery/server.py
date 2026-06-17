@@ -175,6 +175,8 @@ def _make_handler(server: NurseryServer):
                         "reading": reading.to_dict() if reading else None,
                         "energy_w": imp.field.width,
                         "energy_h": imp.field.height,
+                        "energy_d": getattr(imp.field, "depth", 1),
+                        "spatial": imp.field.stats().get("spatial", "2d") if hasattr(imp.field, "stats") else "2d",
                     }
 
                 return _json(self, server._with_lock(_impulse))
@@ -189,6 +191,8 @@ def _make_handler(server: NurseryServer):
                         "enabled": True,
                         "width": imp.field.width,
                         "height": imp.field.height,
+                        "depth": getattr(imp.field, "depth", 1),
+                        "spatial": getattr(imp.field.stats(), "spatial", "2d"),
                         "temporal": getattr(imp.field, "temporal", False),
                         "energy_b64": base64.b64encode(imp.energy_bytes()).decode("ascii"),
                         "phase_b64": (
