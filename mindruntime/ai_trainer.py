@@ -26,22 +26,27 @@ class TrainStepResult:
     message: str = ""
 
 
-class _TinyHead(nn.Module):  # type: ignore[misc]
-    def __init__(self, n_classes: int, spatial: int) -> None:
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(4, 16, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(16, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(32, n_classes),
-        )
-        self._spatial = spatial
+def _build_tiny_head(n_classes: int) -> Any:
+    if not HAS_TORCH:
+        return None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore[name-defined]
-        return self.net(x)
+    class _TinyHead(nn.Module):  # type: ignore[misc]
+        def __init__(self) -> None:
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Conv2d(4, 16, 3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(16, 32, 3, padding=1),
+                nn.ReLU(),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(32, n_classes),
+            )
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore[name-defined]
+            return self.net(x)
+
+    return _TinyHead()
 
 
 class AITrainer:
@@ -52,7 +57,7 @@ class AITrainer:
         self._model: Any = None
         self._optim: Any = None
         if HAS_TORCH and self.class_names:
-            self._model = _TinyHead(len(self.class_names), 32)
+            self._model = _build_tiny_head(len(self.class_names))
             self._optim = torch.optim.Adam(self._model.parameters(), lr=1e-3)
 
     def state_to_tensor(self, state: dict[str, np.ndarray]) -> Any:
