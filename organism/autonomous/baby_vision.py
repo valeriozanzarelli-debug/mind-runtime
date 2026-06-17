@@ -66,6 +66,10 @@ class BabyVisionMixin:
         else:
             return [], ""
         vs = self.vision_sense.process(grid, rgb_grid=rgb_grid)
+        if self.impulse and grid:
+            flat = [grid[y][x] for y in range(len(grid)) for x in range(len(grid[0]))]
+            self.impulse.perceive_visual(flat if len(flat) > 64 else grid)
+            self.impulse.pulse(steps=1)
         if vs.get("skipped") and self._last_visual_features:
             return grid, self._last_vision_hash or str(vs.get("sig", ""))
         sig = str(vs.get("sig") or scene_signature(grid))

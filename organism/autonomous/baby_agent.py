@@ -65,6 +65,12 @@ from organism.cognition.human_thought import (
     thought_coherence,
 )
 from organism.dna.evolution import DNAEvolver
+from organism.brain.impulse_integration import (
+    create_impulse_scaffold,
+    impulse_consciousness_lines,
+    impulse_state_dict,
+    merge_workspace,
+)
 from organism.cognition.motor_plan import MotorPlan
 from organism.cognition.speech_loop import SpeechSensorimotorLoop
 from organism.cognition.thought import ThoughtEngine
@@ -121,6 +127,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self.thought_generator = ThoughtGenerator(seed=seed)
         self.vision_sense = VisionSense()
         self.dna_evolver = DNAEvolver.load()
+        self.impulse = create_impulse_scaffold()
         self._last_inner_voice = ""
         self._last_thought_coherence = 0.0
         self.basal_ganglia = BasalGanglia()
@@ -418,6 +425,13 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             wave_phase=wave_phase,
             has_learned_path=has_path,
         )
+        if self.impulse:
+            if heard:
+                self.impulse.perceive_text(heard)
+            self.impulse.pulse(steps=2)
+            ws = merge_workspace(ws, self.impulse)
+            for line in impulse_consciousness_lines(self.impulse):
+                self._append_consciousness([line])
         thought = self.thought_engine.think(
             org.brain,
             org.memory,
@@ -956,6 +970,11 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         idle = time.time() - self._last_sense_t
         if self.affect._pulse_count % 45 == 0:
             inject_circadian(org.brain)
+
+        if self.impulse:
+            reading = self.impulse.pulse(steps=1)
+            if reading.conscious and reading.thoughts:
+                self._append_consciousness([f"pulse · {reading.thoughts[0][:64]}"])
 
         wave = self.waves.advance(idle=idle > 10, arousal=self.affect.state.curiosity)
         inject_wave(org.brain, wave.phase, tick=wave.tick, amplitude=wave.amplitude)

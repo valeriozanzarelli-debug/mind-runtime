@@ -26,6 +26,8 @@ def _configure_paths() -> None:
     os.environ.setdefault("ORGANISM_BABY_STATE", str(data / "baby_state.json"))
     os.environ.setdefault("ORGANISM_BIND", "127.0.0.1")
     os.environ.setdefault("ORGANISM_PORT", "8765")
+    os.environ.setdefault("ORGANISM_IMPULSE", "1")
+    os.environ.setdefault("ORGANISM_IMPULSE_DEVICE", "auto")
 
 
 def main() -> None:

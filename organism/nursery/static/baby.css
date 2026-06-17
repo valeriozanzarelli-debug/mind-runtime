@@ -479,3 +479,18 @@ body {
     max-height: 180px;
   }
 }
+
+.impulse-field {
+  position: fixed;
+  z-index: 4;
+  right: 0.5rem;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  width: 96px;
+  height: 72px;
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 6px;
+  opacity: 0.75;
+  image-rendering: pixelated;
+  pointer-events: none;
+  background: #000;
+}

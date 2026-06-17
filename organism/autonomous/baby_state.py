@@ -7,6 +7,7 @@ from typing import Any
 from organism.cognition.consciousness_stream import consciousness_events_from_log
 from organism.drives.brain_readout import inject_circadian, read_brain_mood
 from organism.autonomous.baby_types import TZ
+from organism.brain.impulse_integration import impulse_state_dict
 
 
 class BabyStateMixin:
@@ -85,6 +86,7 @@ class BabyStateMixin:
             "consciousness_stream": self.consciousness_recent(32),
             "dialogue": self.dialogue_recent(40),
             "neurons": org.brain.neuron_count if org else 0,
+            "impulse": impulse_state_dict(getattr(self, "impulse", None)),
         }
 
     def state(self) -> dict[str, Any]:

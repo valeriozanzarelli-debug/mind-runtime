@@ -161,6 +161,36 @@ def _make_handler(server: NurseryServer):
                         "state_file_exists": b.store.exists(),
                     },
                 )
+            if path == "/api/baby/impulse":
+                def _impulse():
+                    imp = getattr(server.baby, "impulse", None)
+                    if imp is None:
+                        return {"enabled": False}
+                    reading = imp.last_reading
+                    return {
+                        "enabled": True,
+                        "stats": imp.stats(),
+                        "reading": reading.to_dict() if reading else None,
+                        "energy_w": imp.field.width,
+                        "energy_h": imp.field.height,
+                    }
+
+                return _json(self, server._with_lock(_impulse))
+            if path == "/api/baby/impulse/field":
+                def _field_bytes():
+                    imp = getattr(server.baby, "impulse", None)
+                    if imp is None:
+                        return {"enabled": False}
+                    import base64
+
+                    return {
+                        "enabled": True,
+                        "width": imp.field.width,
+                        "height": imp.field.height,
+                        "energy_b64": base64.b64encode(imp.energy_bytes()).decode("ascii"),
+                    }
+
+                return _json(self, server._with_lock(_field_bytes))
             if path == "/api/baby/state":
                 qs = parse_qs(urlparse(self.path).query)
                 lite = qs.get("lite", ["0"])[0].lower() in ("1", "true", "yes")

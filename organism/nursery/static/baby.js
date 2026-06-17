@@ -631,8 +631,33 @@ async function refreshState() {
   const objs = Object.keys(s.visual_binder?.object_names || {}).length;
   const dlg = s.dialogue_count ?? (s.dialogue_pairs || []).length;
   const mode = dormant ? "sonno" : "veglia";
-  setStatus(`${mode} · ${dlg} dialoghi · ${objs} oggetti · ${s.syllables_known ?? 0} sillabe`);
+  const imp = s.impulse?.enabled ? ` · impulsi ${s.impulse.uses_gpu ? "GPU" : "CPU"}` : "";
+  setStatus(`${mode} · ${dlg} dialoghi · ${objs} oggetti · ${s.syllables_known ?? 0} sillabe${imp}`);
   if (s.dialogue?.length) renderDialogue(s.dialogue);
+}
+
+async function renderImpulseField() {
+  const canvas = document.getElementById("impulse-field");
+  if (!canvas) return;
+  try {
+    const d = await api("/api/baby/impulse/field");
+    if (!d.enabled || !d.energy_b64) return;
+    const w = d.width || 128;
+    const h = d.height || 96;
+    canvas.width = w;
+    canvas.height = h;
+    const raw = atob(d.energy_b64);
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(w, h);
+    for (let i = 0, j = 0; i < raw.length; i++, j += 4) {
+      const v = raw.charCodeAt(i);
+      img.data[j] = v;
+      img.data[j + 1] = Math.min(255, v + 40);
+      img.data[j + 2] = Math.min(255, v + 90);
+      img.data[j + 3] = 220;
+    }
+    ctx.putImageData(img, 0, 0);
+  } catch (_) {}
 }
 
 async function startSenses() {
@@ -847,6 +872,7 @@ document.body.addEventListener("touchstart", onUserActivate, { passive: true });
 document.body.addEventListener("click", onUserActivate);
 
 setInterval(pollMind, 4000);
+setInterval(renderImpulseField, 1800);
 
 if (chatForm) {
   chatForm.addEventListener("submit", (e) => {
