@@ -59,6 +59,11 @@ def main() -> None:
     retina.add_argument("--preset", choices=["baby", "hd", "fullhd"], default="hd")
     retina.add_argument("--pulses", type=int, default=15)
 
+    native = sub.add_parser("native", help="Cervello dendritico locale (OpenCV, no browser)")
+    native.add_argument("--width", type=int, default=256)
+    native.add_argument("--height", type=int, default=256)
+    native.add_argument("--camera", type=int, default=0)
+
     args = parser.parse_args()
 
     if args.cmd == "stats":
@@ -95,6 +100,20 @@ def main() -> None:
     elif args.cmd == "brain":
         org = OrganismRuntime.studio_assistant()
         print(org.brain_visualize(max_nodes=args.max_nodes))
+    elif args.cmd == "native":
+        from mindruntime.visualizer import main as run_native
+        raise SystemExit(
+            run_native(
+                [
+                    "--width",
+                    str(args.width),
+                    "--height",
+                    str(args.height),
+                    "--camera",
+                    str(args.camera),
+                ]
+            )
+        )
     elif args.cmd == "retina":
         from organism.brain.gpu_backend import gpu_info
         from organism.brain.retina_cortex import create_retina_cortex

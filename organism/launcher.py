@@ -16,9 +16,11 @@ def _bundle_root() -> Path:
 def _configure_paths() -> None:
     data = Path.home() / ".organism"
     data.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("ORGANISM_DATA_DIR", str(data))
     os.environ.setdefault("ORGANISM_BABY_STATE", str(data / "baby_state.json"))
     os.environ.setdefault("ORGANISM_LOCAL_ONLY", "1")
     os.environ.setdefault("ORGANISM_NATIVE", "1")
+    os.environ.setdefault("ORGANISM_NO_BROWSER", "1")
 
 
 def main() -> None:
