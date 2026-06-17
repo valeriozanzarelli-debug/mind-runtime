@@ -35,18 +35,19 @@ class MotionModule:
     }
 
     SPATIAL_GESTURE = {
-        "explore": "step_forward",
-        "orient": "turn_toward",
-        "freeze": "recoil",
-        "drift": "idle_alert",
-        "recoil": "recoil",
-        "turn_toward": "turn_toward",
-        "step_forward": "step_forward",
-        "open_arms": "open_arms",
-        "steady_self": "steady_self",
-        "idle_alert": "idle_alert",
-        "reach_up": "reach_up",
-        "nod_confirm": "nod_confirm",
+        "float": "float_forward",
+        "soar": "soar_forward",
+        "drift": "hover",
+        "orient": "turn_gaze",
+        "hover": "hover",
+        "recoil": "hover",
+        "float_forward": "float_forward",
+        "soar_forward": "soar_forward",
+        "turn_gaze": "turn_gaze",
+        "ascend": "ascend",
+        "drift_glow": "drift_glow",
+        "stabilize": "stabilize",
+        "idle_alert": "hover",
     }
 
     def __init__(self, brain, style: str = "neutral") -> None:
