@@ -251,6 +251,19 @@ def _make_handler(server: NurseryServer):
                 except (ValueError, IndexError):
                     n = 50
                 return _json(self, {"ok": True, "log": server.tutor.recent_log(n)})
+            if path == "/api/tutor/squad-report/latest":
+                from pathlib import Path
+
+                latest = Path.home() / ".organism" / "squad_reports" / "latest.json"
+                if not latest.exists():
+                    return _json(self, {"ok": False, "error": "no report yet"})
+                try:
+                    import json
+
+                    data = json.loads(latest.read_text(encoding="utf-8"))
+                    return _json(self, data)
+                except Exception as exc:
+                    return _json(self, {"ok": False, "error": str(exc)})
             if path == "/api/download":
                 from organism.nursery.download_info import download_info
 
@@ -656,6 +669,19 @@ def _make_handler(server: NurseryServer):
                 return _json(self, server.tutor.stop())
             if path == "/api/tutor/tick":
                 return _json(self, server.tutor.tick_once())
+            if path == "/api/tutor/squad-report":
+                def _report():
+                    from organism.reporting.squad_reporter import build_squad_report, persist_report
+
+                    baby_state = server.baby.state_lite() if server.baby._born else {}
+                    tutor_state = server.tutor.status_dict()
+                    report = build_squad_report(baby_state=baby_state, tutor_state=tutor_state)
+                    path_saved = persist_report(report)
+                    report["saved_to"] = str(path_saved)
+                    server.tutor.log("Report squadra Haiku generato")
+                    return report
+
+                return _json(self, _report())
 
             if path == "/api/birth":
                 return _json(self, server._with_lock(server.nursery.birth))

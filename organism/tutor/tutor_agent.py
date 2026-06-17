@@ -74,6 +74,18 @@ class TutorAgent:
     def recent_log(self, n: int = 50) -> list[str]:
         return list(self._log)[-n:]
 
+    def _maybe_squad_report(self) -> None:
+        try:
+            from organism.reporting.squad_reporter import build_squad_report, persist_report
+
+            baby = self._baby_fn()
+            baby_state = baby.state_lite() if getattr(baby, "_born", False) else {}
+            report = build_squad_report(baby_state=baby_state, tutor_state=self.status_dict())
+            persist_report(report)
+            self.log("Report squadra (checkpoint)")
+        except Exception as exc:
+            self.log(f"Report squadra skip: {exc}")
+
     def status_dict(self) -> dict[str, Any]:
         baby = self._baby_fn()
         baby_info: dict[str, Any] = {}
@@ -187,6 +199,7 @@ class TutorAgent:
 
             if cycle % 50 == 0:
                 self.log(f"Checkpoint #{cycle} — probe={result.get('probe', '?')}")
+                self._maybe_squad_report()
 
             if cycle % 200 == 0:
                 self._state.phase = "sleeping"
