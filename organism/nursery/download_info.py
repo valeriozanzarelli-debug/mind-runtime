@@ -19,7 +19,7 @@ def _read_manifest() -> dict[str, Any]:
     if MANIFEST_PATH.is_file():
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     return {
-        "version": "0.8.0",
+        "version": "0.8.1",
         "product": "ORGANISM",
         "windows": {
             "filename": "ORGANISM-Windows.exe",
