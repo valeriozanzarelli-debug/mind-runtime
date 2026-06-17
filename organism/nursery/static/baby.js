@@ -647,13 +647,15 @@ async function renderImpulseField() {
     canvas.width = w;
     canvas.height = h;
     const raw = atob(d.energy_b64);
+    const phaseRaw = d.phase_b64 ? atob(d.phase_b64) : null;
     const ctx = canvas.getContext("2d");
     const img = ctx.createImageData(w, h);
     for (let i = 0, j = 0; i < raw.length; i++, j += 4) {
       const v = raw.charCodeAt(i);
+      const ph = phaseRaw ? phaseRaw.charCodeAt(i) : v;
       img.data[j] = v;
-      img.data[j + 1] = Math.min(255, v + 40);
-      img.data[j + 2] = Math.min(255, v + 90);
+      img.data[j + 1] = Math.min(255, Math.floor(ph * 0.85 + v * 0.15));
+      img.data[j + 2] = Math.min(255, v + Math.floor(ph * 0.35));
       img.data[j + 3] = 220;
     }
     ctx.putImageData(img, 0, 0);

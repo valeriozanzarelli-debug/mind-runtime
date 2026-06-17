@@ -120,6 +120,10 @@ class ImpulseScaffold:
     def energy_bytes(self) -> bytes:
         return self.field.to_energy_bytes()
 
+    def phase_bytes(self) -> bytes | None:
+        fn = getattr(self.field, "to_phase_bytes", None)
+        return fn() if callable(fn) else None
+
     def to_dict(self) -> dict[str, Any]:
         return {"memory": self.memory.to_dict(), "stats": self.stats()}
 

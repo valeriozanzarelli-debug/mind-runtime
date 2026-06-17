@@ -480,4 +480,10 @@ class ImpulseField:
 
 
 def create_impulse_field(width: int, height: int, *, device: str = "auto") -> ImpulseField:
+    import os
+
+    if os.environ.get("ORGANISM_TEMPORAL", "1") != "0":
+        from organism.brain.temporal_impulse_field import create_temporal_impulse_field
+
+        return create_temporal_impulse_field(width, height, device=device)  # type: ignore[return-value]
     return ImpulseField(width=width, height=height, device=device)

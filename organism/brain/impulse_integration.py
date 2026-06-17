@@ -13,6 +13,10 @@ def impulse_enabled() -> bool:
     return os.environ.get("ORGANISM_IMPULSE", "1") != "0"
 
 
+def temporal_enabled() -> bool:
+    return os.environ.get("ORGANISM_TEMPORAL", "1") != "0"
+
+
 def create_impulse_scaffold() -> ImpulseScaffold | None:
     if not impulse_enabled():
         return None
@@ -67,4 +71,5 @@ def impulse_consciousness_lines(impulse: ImpulseScaffold | None) -> list[str]:
 def impulse_state_dict(impulse: ImpulseScaffold | None) -> dict[str, Any]:
     if impulse is None:
         return {"enabled": False}
-    return {"enabled": True, **impulse.stats()}
+    out = {"enabled": True, "temporal": temporal_enabled(), **impulse.stats()}
+    return out

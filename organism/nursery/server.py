@@ -187,7 +187,13 @@ def _make_handler(server: NurseryServer):
                         "enabled": True,
                         "width": imp.field.width,
                         "height": imp.field.height,
+                        "temporal": getattr(imp.field, "temporal", False),
                         "energy_b64": base64.b64encode(imp.energy_bytes()).decode("ascii"),
+                        "phase_b64": (
+                            base64.b64encode(pb).decode("ascii")
+                            if (pb := imp.phase_bytes()) is not None
+                            else None
+                        ),
                     }
 
                 return _json(self, server._with_lock(_field_bytes))

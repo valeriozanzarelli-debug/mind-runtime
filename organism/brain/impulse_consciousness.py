@@ -13,6 +13,8 @@ from typing import Any, Literal
 
 from organism.brain.impulse_field import ImpulseBlob, ImpulseField
 
+FieldLike = ImpulseField  # ImpulseField | TemporalImpulseField — stessa API
+
 OutputMode = Literal["silent", "flow", "reflect", "speak"]
 
 
@@ -54,6 +56,10 @@ class ConsciousnessReading:
     novelty: float = 0.0
     self_signal: float = 0.0
 
+    recognized: list[dict[str, Any]] = field(default_factory=list)
+    phase_coherence: float = 0.0
+    acceleration: float = 0.0
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "conscious": self.conscious,
@@ -70,6 +76,9 @@ class ConsciousnessReading:
             "flux": round(self.flux, 4),
             "novelty": round(self.novelty, 4),
             "self_signal": round(self.self_signal, 4),
+            "phase_coherence": round(self.phase_coherence, 4),
+            "acceleration": round(self.acceleration, 4),
+            "recognized": self.recognized[:8],
         }
 
 
@@ -86,7 +95,7 @@ class ImpulseConsciousness:
 
     def observe(
         self,
-        field: ImpulseField,
+        field: FieldLike,
         *,
         recalled_memories: list[dict[str, Any]] | None = None,
         heard: str = "",
@@ -98,13 +107,17 @@ class ImpulseConsciousness:
         self._region_hist.append(regional)
         flux = field.flux_magnitude()
         novelty = self._compute_novelty(field.signature())
+        phase_coh = float(getattr(field, "phase_coherence", lambda: 0.0)())
+        accel = float(getattr(field, "acceleration_magnitude", lambda: 0.0)())
+        recognized_raw = getattr(field, "recognized_symbols", lambda: [])()
+        recognized = [{"symbol": s, "score": round(sc, 4)} for s, sc in recognized_raw[:6]]
 
         regions = self._region_states(field, regional, blobs)
         focus_region, focus_point = self._focus(regions, blobs)
-        sensations = self._sensations(regions, blobs, flux)
+        sensations = self._sensations(regions, blobs, flux, phase_coh)
         memories = [str(m.get("label", m.get("id", "mem"))) for m in (recalled_memories or [])[:6]]
-        thoughts = self._thoughts(regions, blobs, heard, pressure, memories)
-        ignition = self._ignition(regional, flux, novelty, pressure, len(blobs))
+        thoughts = self._thoughts(regions, blobs, heard, pressure, memories, recognized, phase_coh)
+        ignition = self._ignition(regional, flux, novelty, pressure, len(blobs), phase_coh, accel)
         conscious = ignition >= self.threshold
         self_signal = min(1.0, 0.4 * ignition + 0.35 * self._continuity + 0.25 * pressure)
         if conscious:
@@ -139,11 +152,14 @@ class ImpulseConsciousness:
             flux=flux,
             novelty=novelty,
             self_signal=self_signal,
+            phase_coherence=phase_coh,
+            acceleration=accel,
+            recognized=recognized,
         )
 
     def _region_states(
         self,
-        field: ImpulseField,
+        field: FieldLike,
         regional: dict[str, float],
         blobs: list[ImpulseBlob],
     ) -> list[RegionState]:
@@ -187,6 +203,7 @@ class ImpulseConsciousness:
         regions: list[RegionState],
         blobs: list[ImpulseBlob],
         flux: float,
+        phase_coh: float = 0.0,
     ) -> list[str]:
         out: list[str] = []
         vis = next((r for r in regions if r.name == "visual"), None)
@@ -197,6 +214,8 @@ class ImpulseConsciousness:
             out.append(f"SEN:sento:{aud.energy:.2f}")
         if flux > 0.12:
             out.append(f"SEN:movimento:{flux:.2f}")
+        if phase_coh > 0.55:
+            out.append(f"SEN:risonanza:{phase_coh:.2f}")
         moving = [b for b in blobs if math.hypot(b.vx, b.vy) > 0.05]
         if moving:
             out.append(f"SEN:impulso:{len(moving)}")
@@ -209,6 +228,8 @@ class ImpulseConsciousness:
         heard: str,
         pressure: float,
         memories: list[str],
+        recognized: list[dict[str, Any]] | None = None,
+        phase_coh: float = 0.0,
     ) -> list[str]:
         thoughts: list[str] = []
         assoc = next((r for r in regions if r.name == "associative"), None)
@@ -217,6 +238,13 @@ class ImpulseConsciousness:
             thoughts.append(f"udito:{heard[:48]}")
         if memories:
             thoughts.append(f"richiamo:{' · '.join(memories[:3])}")
+        for rec in recognized or []:
+            sym = rec.get("symbol", "")
+            sc = rec.get("score", 0.0)
+            if sym and sc > 0.2:
+                thoughts.append(f"simbolo:{sym}({sc:.2f})")
+        if phase_coh > 0.6:
+            thoughts.append(f"attenzione:{phase_coh:.2f}")
         if assoc and assoc.active:
             thoughts.append(f"pattern:{assoc.energy:.2f}")
         if motor and motor.energy > 0.1:
@@ -249,19 +277,23 @@ class ImpulseConsciousness:
         novelty: float,
         pressure: float,
         blob_count: int,
+        phase_coh: float = 0.0,
+        accel: float = 0.0,
     ) -> float:
         assoc = regional.get("associative", 0.0)
         visual = regional.get("visual", 0.0)
         motor = regional.get("motor", 0.0)
         return min(
             1.0,
-            0.22 * visual
-            + 0.28 * assoc
-            + 0.12 * motor
-            + 0.18 * flux
-            + 0.10 * novelty
-            + 0.14 * pressure
-            + 0.04 * min(1.0, blob_count / 8),
+            0.20 * visual
+            + 0.26 * assoc
+            + 0.11 * motor
+            + 0.16 * flux
+            + 0.09 * novelty
+            + 0.12 * pressure
+            + 0.04 * min(1.0, blob_count / 8)
+            + 0.06 * phase_coh
+            + 0.06 * min(1.0, accel * 4),
         )
 
     def _compute_novelty(self, signature: list[float]) -> float:

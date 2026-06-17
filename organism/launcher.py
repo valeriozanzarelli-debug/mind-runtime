@@ -28,6 +28,8 @@ def _configure_paths() -> None:
     os.environ.setdefault("ORGANISM_PORT", "8765")
     os.environ.setdefault("ORGANISM_IMPULSE", "1")
     os.environ.setdefault("ORGANISM_IMPULSE_DEVICE", "auto")
+    os.environ.setdefault("ORGANISM_TEMPORAL", "1")
+    os.environ.setdefault("ORGANISM_LOCAL_ONLY", "1")
 
 
 def main() -> None:
@@ -55,8 +57,9 @@ def main() -> None:
         except Exception:
             pass
 
-    print("\n  ORGANISM · Baby locale")
+    print("\n  ORGANISM · Baby locale (GPU temporale)")
     print(f"  {url}")
+    print("  Solo localhost — nessun server remoto.")
     print("  Chiudi questa finestra per uscire.\n")
     webbrowser.open(url)
 
