@@ -5,9 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import Any
-from zoneinfo import ZoneInfo
-
-TZ = ZoneInfo("Europe/Madrid")
+from organism.timezone_util import TZ
 
 _COLOR_WORDS = frozenset(
     {"rosso", "verde", "blu", "giallo", "nero", "bianco", "grigio", "rosa", "arancione", "marrone"}

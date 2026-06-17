@@ -7,7 +7,7 @@ Set-Location $PSScriptRoot\..
 Write-Host "=== Build ORGANISM Windows .exe ===" -ForegroundColor Cyan
 
 python -m pip install --upgrade pip
-python -m pip install -e ".[full]" pyinstaller
+python -m pip install -e ".[full]" pyinstaller tzdata
 
 Write-Host "Compilo con PyInstaller..." -ForegroundColor Yellow
 python -m PyInstaller packaging/organism_windows.spec --noconfirm --clean

@@ -41,12 +41,15 @@ hiddenimports = [
 ]
 
 try:
-    from PyInstaller.utils.hooks import collect_submodules
+    from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
     hiddenimports += collect_submodules("organism")
     hiddenimports += collect_submodules("mind")
+    added_datas += collect_data_files("tzdata")
 except Exception:
     pass
+
+hiddenimports += ["tzdata", "zoneinfo"]
 
 a = Analysis(
     [str(ROOT / "organism" / "launcher.py")],
@@ -56,7 +59,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(ROOT / "packaging" / "pyi_rth_tzdata.py")],
     excludes=["tkinter", "matplotlib", "scipy", "torch", "pytest"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

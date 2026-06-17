@@ -6,8 +6,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo
-
+from organism.timezone_util import TZ
 from organism.autonomous.baby_store import BabyStore, baby_state_path
 from organism.brain.growth import (
     active_ids,
@@ -69,7 +68,6 @@ from organism.sensory.web_media import (
 from organism.teaching.dialogue import DialogueTeacher
 from organism.teaching.repetition import RepetitionTeacher
 
-TZ = ZoneInfo("Europe/Madrid")
 _COLOR_WORDS = frozenset(
     {"rosso", "verde", "blu", "giallo", "nero", "bianco", "grigio", "rosa", "arancione", "marrone"}
 )

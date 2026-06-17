@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo
-
-TZ = ZoneInfo("Europe/Madrid")
+from organism.timezone_util import TZ
 
 
 @dataclass
