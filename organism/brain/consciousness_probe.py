@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from organism.brain.retina_cortex import RetinaCortex
+from organism.brain.gpu_backend import scalar
 
 OutputMode = Literal["flow", "reflect", "speak", "silent"]
 
@@ -128,8 +129,8 @@ class ConsciousnessProbe:
         """Lettura puntuale — coscienza fissa su un singolo neurone-pixel."""
         sal_map = cortex.salience_map()
         if hasattr(sal_map, "__getitem__") and not isinstance(sal_map[0], list):
-            sal = float(sal_map[y, x])
-            act = float(cortex.activation[y, x])
+            sal = scalar(sal_map[y, x])
+            act = scalar(cortex.activation[y, x])
         else:
             sal = float(sal_map[y][x])
             act = float(cortex.activation[y][x])
@@ -148,7 +149,7 @@ class ConsciousnessProbe:
             if hasattr(cortex.activation, "__getitem__") and not isinstance(
                 cortex.activation[0], list
             ):
-                activation = float(cortex.activation[y, x])
+                activation = scalar(cortex.activation[y, x])
             else:
                 activation = float(cortex.activation[y][x])
         return FocalPoint(

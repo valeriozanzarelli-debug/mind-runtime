@@ -3,7 +3,8 @@
 import pytest
 
 from organism.brain.consciousness_probe import ConsciousnessProbe
-from organism.brain.retina_cortex import LongRangeSynapse, RetinaCortex
+from organism.brain.gpu_backend import gpu_info, has_torch, resolve_device
+from organism.brain.retina_cortex import LongRangeSynapse, RetinaCortex, create_retina_cortex
 
 
 def _bright_spot_grid(size: int = 32, cx: int = 16, cy: int = 16, radius: int = 4) -> list[list[int]]:
@@ -73,9 +74,34 @@ def test_large_retina_scale():
         import numpy as np  # noqa: F401
     except ImportError:
         pytest.skip("numpy required for large retina")
-    cortex = RetinaCortex(width=256, height=256)
+    cortex = RetinaCortex(width=256, height=256, device="numpy")
     assert cortex.neuron_count == 65_536
     grid = _bright_spot_grid(256, cx=128, cy=128, radius=8)
     cortex.inject_pixels(grid)
     cortex.propagate(steps=2)
     assert cortex.stats()["neurons"] == 65_536
+
+
+def test_gpu_info_returns_dict():
+    info = gpu_info()
+    assert "recommended" in info
+    assert "torch" in info
+
+
+@pytest.mark.skipif(not has_torch(), reason="torch not installed")
+def test_torch_cpu_backend():
+    cortex = create_retina_cortex(64, 64, device="cpu")
+    assert cortex.stats()["backend"] == "cpu"
+    cortex.inject_pixels(_bright_spot_grid(64, 30, 20))
+    cortex.propagate(steps=3)
+    snap = ConsciousnessProbe().read(cortex, pressure=0.2)
+    assert snap.focus is not None
+    assert cortex.mean_activation() > 0
+
+
+@pytest.mark.skipif(not has_torch(), reason="torch not installed")
+def test_auto_device_factory():
+    dev = resolve_device("auto")
+    assert dev in ("cpu", "cuda", "numpy") or dev.startswith("cuda")
+    cortex = create_retina_cortex(48, 48, device="auto")
+    assert cortex.neuron_count == 48 * 48

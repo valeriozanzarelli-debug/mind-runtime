@@ -51,6 +51,14 @@ def main() -> None:
     viz = sub.add_parser("brain", help="Visualize brain sample")
     viz.add_argument("--max-nodes", type=int, default=30)
 
+    retina = sub.add_parser("retina", help="Retina GPU locale — milioni di neuroni-pixel")
+    retina.add_argument("--info", action="store_true", help="Diagnostica GPU")
+    retina.add_argument("--width", type=int, default=1024)
+    retina.add_argument("--height", type=int, default=768)
+    retina.add_argument("--device", default="auto", help="auto | cuda | cpu | numpy")
+    retina.add_argument("--preset", choices=["baby", "hd", "fullhd"], default="hd")
+    retina.add_argument("--pulses", type=int, default=15)
+
     args = parser.parse_args()
 
     if args.cmd == "stats":
@@ -87,6 +95,39 @@ def main() -> None:
     elif args.cmd == "brain":
         org = OrganismRuntime.studio_assistant()
         print(org.brain_visualize(max_nodes=args.max_nodes))
+    elif args.cmd == "retina":
+        from organism.brain.gpu_backend import gpu_info
+        from organism.brain.retina_cortex import create_retina_cortex
+        from organism.brain.consciousness_probe import ConsciousnessProbe
+        import time
+
+        if args.info:
+            print(json.dumps(gpu_info(), indent=2))
+        else:
+            presets = {"baby": (320, 256), "hd": (1024, 768), "fullhd": (1920, 1080)}
+            w, h = presets.get(args.preset, (args.width, args.height))
+            cortex = create_retina_cortex(w, h, device=args.device)
+            grid = [[0] * w for _ in range(h)]
+            cx, cy = w // 2, h // 3
+            for y in range(h):
+                for x in range(w):
+                    if (x - cx) ** 2 + (y - cy) ** 2 < 36:
+                        grid[y][x] = 220
+            cortex.inject_pixels(grid)
+            probe = ConsciousnessProbe()
+            times = []
+            snap = None
+            for _ in range(args.pulses):
+                t0 = time.perf_counter()
+                cortex.propagate(steps=3)
+                snap = probe.read(cortex, sensory_tags=["VIS:scene"], pressure=0.3)
+                times.append(time.perf_counter() - t0)
+            out = {
+                **cortex.stats(),
+                "pulse_ms_avg": round(1000 * sum(times) / len(times), 2),
+                "consciousness": snap.to_dict() if snap else {},
+            }
+            print(json.dumps(out, indent=2))
 
 
 def _load(args) -> OrganismRuntime:
