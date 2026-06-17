@@ -60,6 +60,7 @@ def main() -> None:
     print("\n  ORGANISM · Baby locale (GPU temporale)")
     print(f"  {url}")
     print("  Solo localhost — nessun server remoto.")
+    print("  Motore Numba CUDA puro: python -m mindruntime.visualizer")
     print("  Chiudi questa finestra per uscire.\n")
     webbrowser.open(url)
 

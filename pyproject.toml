@@ -23,6 +23,13 @@ dev = ["pytest>=8.0"]
 sensory = ["numpy>=1.24"]
 gpu = ["numpy>=1.24", "torch>=2.0"]
 full = ["pytest>=8.0", "numpy>=1.24", "pillow>=10.0", "tzdata>=2024.1"]
+mindruntime = [
+    "numpy>=1.24",
+    "numba>=0.59",
+    "scipy>=1.11",
+    "opencv-python>=4.8",
+    "matplotlib>=3.8",
+]
 
 [project.urls]
 Homepage = "https://github.com/valeriozanzarelli-debug/mind-runtime"
@@ -33,6 +40,7 @@ Issues = "https://github.com/valeriozanzarelli-debug/mind-runtime/issues"
 mind = "mind.cli:main"
 organism = "organism.cli:main"
 nursery = "organism.nursery.server:main"
+mindruntime = "mindruntime.visualizer:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -40,7 +48,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["mind*", "organism*"]
+include = ["mind*", "organism*", "mindruntime*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
