@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[full]" pyinstaller tzdata
+          pip install -e ".[full,mindruntime]" pyinstaller tzdata
 
       - name: Build EXE
         run: python -m PyInstaller packaging/organism_windows.spec --noconfirm --clean

@@ -22,6 +22,11 @@ hiddenimports = [
     "organism.autonomous.baby_agent",
     "organism.autonomous.baby_store",
     "organism.brain",
+    "organism.brain.temporal_impulse_field",
+    "organism.brain.resonance_templates",
+    "organism.brain.impulse_field",
+    "organism.brain.impulse_scaffold",
+    "organism.brain.impulse_integration",
     "organism.cognition",
     "organism.dna",
     "organism.dna.interpreter",
@@ -32,9 +37,15 @@ hiddenimports = [
     "organism.teaching",
     "mind",
     "mind.types",
+    "mindruntime",
+    "mindruntime.gpu_engine",
+    "mindruntime.gpu_core",
+    "mindruntime.resonators",
+    "mindruntime.cuda_util",
     "yaml",
     "PIL",
     "PIL.Image",
+    "numpy",
     "json",
     "http.server",
     "threading",
@@ -45,6 +56,7 @@ try:
 
     hiddenimports += collect_submodules("organism")
     hiddenimports += collect_submodules("mind")
+    hiddenimports += collect_submodules("mindruntime")
     added_datas += collect_data_files("tzdata")
 except Exception:
     pass
