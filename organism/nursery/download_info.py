@@ -10,7 +10,7 @@ from typing import Any
 STATIC_DIR = Path(os.environ.get("ORGANISM_STATIC_DIR", Path(__file__).parent / "static"))
 MANIFEST_PATH = STATIC_DIR / "releases" / "manifest.json"
 DEFAULT_GITHUB = (
-    "https://github.com/valeriozanzarelli-debug/mind-runtime/releases/latest/download/ORGANISM-Windows.exe"
+    "https://github.com/valeriozanzarelli-debug/mind-runtime/releases/download/windows-latest/ORGANISM-Windows.exe"
 )
 
 
@@ -37,17 +37,19 @@ def download_info(*, base_path: str = "") -> dict[str, Any]:
     local_url = f"{bp}/static/releases/{filename}" if local.is_file() else ""
     github_url = str(win.get("github_release") or DEFAULT_GITHUB)
     size_mb = round(local.stat().st_size / (1024 * 1024), 1) if local.is_file() else None
+    has_local = local.is_file()
     return {
         "product": manifest.get("product", "ORGANISM"),
         "version": manifest.get("version", "0.5.0"),
         "windows": {
             "filename": filename,
-            "available": bool(local.is_file()),
-            "url": local_url or github_url,
+            "available": has_local,
+            "url": local_url if has_local else "",
             "mirror_github": github_url,
-            "local": bool(local.is_file()),
+            "local": has_local,
             "size_mb": size_mb,
             "min_windows": win.get("min_windows", "10"),
             "notes": win.get("notes", ""),
+            "build_url": "https://github.com/valeriozanzarelli-debug/mind-runtime/actions/workflows/build-windows.yml",
         },
     }

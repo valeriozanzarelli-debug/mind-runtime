@@ -18,17 +18,35 @@ hiddenimports = [
     "organism",
     "organism.nursery",
     "organism.nursery.server",
+    "organism.nursery.download_info",
     "organism.autonomous.baby_agent",
+    "organism.autonomous.baby_store",
     "organism.brain",
     "organism.cognition",
     "organism.dna",
+    "organism.dna.interpreter",
     "organism.motor",
     "organism.sensory",
+    "organism.learning",
+    "organism.drives",
+    "organism.teaching",
     "mind",
+    "mind.types",
     "yaml",
     "PIL",
     "PIL.Image",
+    "json",
+    "http.server",
+    "threading",
 ]
+
+try:
+    from PyInstaller.utils.hooks import collect_submodules
+
+    hiddenimports += collect_submodules("organism")
+    hiddenimports += collect_submodules("mind")
+except Exception:
+    pass
 
 a = Analysis(
     [str(ROOT / "organism" / "launcher.py")],
