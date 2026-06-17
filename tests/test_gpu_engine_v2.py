@@ -41,5 +41,5 @@ def test_brain_engine_v2_loop():
         r = eng.step(frame)
     assert r["tick"] == 8
     assert eng.export_state_for_training()["voltage"].shape == (48, 48)
-    img = eng.render()
+    img = eng.render(mode="phase_coherence")
     assert img.shape == (48, 48, 3)

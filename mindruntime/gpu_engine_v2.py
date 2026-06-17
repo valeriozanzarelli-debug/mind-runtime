@@ -121,17 +121,38 @@ class BrainEngineV2:
             "fps": round(self._stats.fps, 1),
         }
 
-    def render(self) -> np.ndarray:
-        ph = self._field[:, :, CH_PH]
-        coh = self._field[:, :, CH_COH]
-        en = self._field[:, :, CH_EN]
-        v = self._field[:, :, CH_V]
-        vm = np.clip((v + 70) / 90, 0, 1)
-        h = (ph / TWO_PI) % 1.0
-        s = np.clip(0.2 + coh * 0.75, 0, 1)
-        val = np.clip(0.25 + coh * 0.4 + en * 0.3 + vm * 0.2, 0, 1)
-        rgb = _hsv_to_rgb(h, s, val)
-        return (rgb * 255).astype(np.uint8)
+    @property
+    def step_count(self) -> int:
+        return self._stats.tick
+
+    def render(self, mode: str = "phase_coherence") -> np.ndarray:
+        if mode == "phase_coherence":
+            ph = self._field[:, :, CH_PH]
+            coh = self._field[:, :, CH_COH]
+            en = self._field[:, :, CH_EN]
+            v = self._field[:, :, CH_V]
+            vm = np.clip((v + 70) / 90, 0, 1)
+            h = (ph / TWO_PI) % 1.0
+            s = np.clip(0.2 + coh * 0.75, 0, 1)
+            val = np.clip(0.25 + coh * 0.4 + en * 0.3 + vm * 0.2, 0, 1)
+            rgb = _hsv_to_rgb(h, s, val)
+            return (rgb * 255).astype(np.uint8)
+
+        if mode == "voltage":
+            import cv2
+
+            voltage = self._field[:, :, CH_V]
+            norm = np.clip((voltage + 80.0) / 120.0, 0, 1)
+            gray = (norm * 255).astype(np.uint8)
+            return cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+
+        if mode == "impulse":
+            import cv2
+
+            impulse = np.clip(self._field[:, :, CH_IMP] * 255, 0, 255).astype(np.uint8)
+            return cv2.cvtColor(impulse, cv2.COLOR_GRAY2RGB)
+
+        raise ValueError(f"Mode '{mode}' non riconosciuto")
 
     def render_composite(self, camera_bgr: np.ndarray | None = None) -> np.ndarray:
         brain = self.render()
@@ -160,6 +181,59 @@ class BrainEngineV2:
             if sym != self._stats.locked_symbol:
                 lines.append(f"{sym}:{sc:.2f}")
         return lines
+
+    def get_recognition_zones(self, coherence_min: float = 0.7) -> list[tuple[int, int, float]]:
+        coh = self._field[:, :, CH_COH]
+        active = np.argwhere(coh > coherence_min)
+        zones = [(int(y), int(x), float(coh[y, x])) for y, x in active]
+        zones.sort(key=lambda t: t[2], reverse=True)
+        return zones
+
+    def get_statistics(self) -> dict[str, float | int]:
+        f = self._field
+        return {
+            "impulse_mean": float(f[:, :, CH_IMP].mean()),
+            "impulse_std": float(f[:, :, CH_IMP].std()),
+            "voltage_mean": float(f[:, :, CH_V].mean()),
+            "coherence_mean": float(f[:, :, CH_COH].mean()),
+            "coherence_max": float(f[:, :, CH_COH].max()),
+            "active_neurons": int(np.sum(f[:, :, CH_IMP] > 0.5)),
+            "spiking_neurons": int(np.sum(f[:, :, CH_V] > 0.0)),
+            "order_parameter": self._stats.order_parameter,
+            "free_energy": self._stats.free_energy,
+        }
+
+    def export_state(self) -> dict[str, Any]:
+        return {
+            "field": self._field.copy(),
+            "spike_time": self._spike_time.copy(),
+            "shape": self._field.shape,
+            "step_count": self._stats.tick,
+            "timestamp": time.time(),
+            "params": {
+                "width": self.width,
+                "height": self.height,
+                "seed": self.seed,
+                "order_parameter": self._stats.order_parameter,
+                "mean_coherence": self._stats.mean_coherence,
+            },
+        }
+
+    def import_state(self, state_dict: dict[str, Any]) -> None:
+        field = state_dict.get("field")
+        if field is None and "field_bytes" in state_dict:
+            field = np.frombuffer(state_dict["field_bytes"], dtype=np.float32).reshape(state_dict["shape"])
+        if field is None:
+            raise ValueError("state_dict senza campo 'field'")
+        field = np.asarray(field, dtype=np.float32)
+        if field.shape != self._field.shape:
+            raise ValueError(f"shape mismatch: {field.shape} vs {self._field.shape}")
+        self._field[:] = field
+        st = state_dict.get("spike_time")
+        if st is not None:
+            self._spike_time[:] = np.asarray(st, dtype=np.float32)
+        self._stats.tick = int(state_dict.get("step_count", self._stats.tick))
+        self._initialized = True
 
     def export_state_for_training(self) -> dict[str, np.ndarray]:
         return {

@@ -18,6 +18,8 @@ import numpy as np
 from mindruntime.cuda_util import cuda_info
 from mindruntime.local_store import append_tick, save_snapshot, store_info
 
+RENDER_MODES = ("phase_coherence", "voltage", "impulse")
+
 
 def _engine_cls():
     if os.environ.get("ORGANISM_ENGINE", "v2").lower() in ("legacy", "v1", "dendritic"):
@@ -38,7 +40,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--no-display", action="store_true")
     p.add_argument("--legacy", action="store_true", help="motore dendritico V1")
     p.add_argument("--max-frames", type=int, default=0)
+    p.add_argument(
+        "--render-mode",
+        choices=RENDER_MODES,
+        default="phase_coherence",
+        help="modalità rendering V2 (M per ciclare in runtime)",
+    )
     return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
     try:
         import cv2
     except ImportError:
@@ -52,7 +63,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     print(f"  Backend: {'CUDA' if info.get('cuda') else 'CPU'}")
     print(f"  Griglia: {args.width}×{args.height}")
     print(f"  Dati: {paths['dir']}")
-    print("  Q o ESC per uscire\n")
+    print("  Q/ESC esci · M modalità rendering · S snapshot\n")
 
     if args.legacy:
         os.environ["ORGANISM_ENGINE"] = "legacy"
@@ -63,6 +74,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     frames = 0
     t0 = time.perf_counter()
     last_save_tick = 0
+    render_mode = args.render_mode
+    render_idx = RENDER_MODES.index(render_mode) if render_mode in RENDER_MODES else 0
 
     def _flush_on_exit() -> None:
         if frames > 0:
@@ -115,7 +128,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                 last_save_tick = engine.stats.tick
 
             if not args.no_display:
-                show = engine.render_composite(bgr)
+                if hasattr(engine, "render") and render_mode in RENDER_MODES:
+                    try:
+                        brain_rgb = engine.render(mode=render_mode)
+                        show = cv2.cvtColor(brain_rgb, cv2.COLOR_RGB2BGR)
+                    except TypeError:
+                        show = engine.render_composite(bgr)
+                else:
+                    show = engine.render_composite(bgr)
+
+                zones = engine.get_recognition_zones() if hasattr(engine, "get_recognition_zones") else []
+                for i, (zy, zx, coh) in enumerate(zones[:5]):
+                    cv2.circle(show, (zx, zy), 5, (0, 255, 0), 2)
+
                 y = 22
                 for line in engine.overlay_lines():
                     cv2.putText(
@@ -131,7 +156,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     y += 18
                 cv2.putText(
                     show,
-                    f"save: {paths['dir'][-28:]}",
+                    f"mode={render_mode} · save: {paths['dir'][-28:]}",
                     (10, show.shape[0] - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.35,
@@ -143,6 +168,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                 key = cv2.waitKey(1) & 0xFF
                 if key in (27, ord("q"), ord("Q")):
                     break
+                if key in (ord("m"), ord("M")):
+                    render_idx = (render_idx + 1) % len(RENDER_MODES)
+                    render_mode = RENDER_MODES[render_idx]
+                    print(f"[INFO] Modalità rendering: {render_mode}")
+                if key in (ord("s"), ord("S")) and hasattr(engine, "export_state"):
+                    snap = engine.export_state()
+                    fname = paths["dir"] + f"/brain_step_{engine.stats.tick}.npz"
+                    np.savez_compressed(fname, **{k: v for k, v in snap.items() if k != "params"})
+                    print(f"[INFO] Snapshot: {fname}")
 
             if args.max_frames and frames >= args.max_frames:
                 break
