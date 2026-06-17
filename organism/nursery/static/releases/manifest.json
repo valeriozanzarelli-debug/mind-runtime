@@ -1,10 +1,10 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "product": "ORGANISM",
   "windows": {
     "filename": "ORGANISM-Windows.exe",
     "github_release": "https://github.com/valeriozanzarelli-debug/mind-runtime/releases/download/windows-latest/ORGANISM-Windows.exe",
     "min_windows": "10",
-    "notes": "Doppio clic apre Baby nel browser. Webcam e microfono. Stato in %USERPROFILE%\\.organism\\"
+    "notes": "Finestra nativa OpenCV — cervello dendritico Na/K/Ca. Webcam locale. Nessun browser. Stato in %USERPROFILE%\\.organism\\"
   }
 }

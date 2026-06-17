@@ -72,37 +72,23 @@ Output atteso con RTX 1060:
 
 Se `cuda: false`, reinstalla driver NVIDIA e verifica che `numba` veda la GPU.
 
-## 6. Avvio visualizer (webcam)
+## 6. Avvio (finestra nativa — nessun browser)
 
 ```powershell
 python -m mindruntime.visualizer
 ```
 
-Opzioni utili:
+Oppure doppio clic su **ORGANISM-Windows.exe** — si apre solo la finestra OpenCV con:
+- mappa coerenza dendritica (Ca²⁺ / fase)
+- inset webcam in basso a destra
+- simboli riconosciuti per risonanza
 
-```powershell
-# Griglia 256×256 (default, ~65k neuroni, <300 MB VRAM)
-python -m mindruntime.visualizer --width 256 --height 256
+**Q** o **ESC** per uscire.
 
-# Immagine statica
-python -m mindruntime.visualizer --image foto.jpg
+## 7. ORGANISM server (opzionale, solo sviluppo)
 
-# Benchmark senza finestra
-python -m mindruntime.visualizer --image foto.jpg --no-display --max-frames 120
-```
-
-**Target performance:** ≥ 30 FPS su 256×256 con RTX 1060 (2 step/tick).
-
-## 7. ORGANISM Baby (browser locale, opzionale)
-
-L'EXE / launcher Baby usa PyTorch impulse field + server HTTP su `127.0.0.1`:
-
-```powershell
-pip install -e ".[full,gpu]"
-python -m organism.launcher
-```
-
-Per il motore **Numba puro** senza browser, usa sempre `python -m mindruntime.visualizer`.
+Il server HTTP Baby (`python -m organism.nursery.server`) resta nel repo per deploy remoto,
+ma **l'EXE e il launcher locale non aprono più il browser**.
 
 ## Variabili ambiente
 
