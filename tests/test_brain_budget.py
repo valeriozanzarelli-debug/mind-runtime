@@ -21,16 +21,23 @@ def test_analyze_brain_layers():
 
 
 def test_gpu_resolution_8gb():
-    w, h, mb = recommend_gpu_resolution(8192)
-    assert w >= 512
-    assert h >= 384
+    w, h, d, mb = recommend_gpu_resolution(8192)
+    assert w >= 128
+    assert h >= 128
+    assert d >= 8
     assert mb < 2500
-    assert w <= 4096
+    assert w <= 512
+
+
+def test_gpu_resolution_3d_voxels():
+    w, h, d, mb = recommend_gpu_resolution(8192, depth=128)
+    voxels = w * h * d
+    assert voxels >= 10_000_000
 
 
 def test_recommend_tier_16gb():
     tier = recommend_graph_tier(16)
-    assert tier["recommended_variant"] in ("giga", "mind_giga", "mega", "ultra")
+    assert tier["recommended_variant"] in ("giga", "mind_giga", "mind_compact", "mega", "ultra", "ultra_compact")
 
 
 def test_capacity_plan_totals():
@@ -38,8 +45,9 @@ def test_capacity_plan_totals():
         graph_neurons=4_000_000,
         graph_thinking=2_200_000,
         graph_synapses=16_000_000,
-        gpu_w=4096,
-        gpu_h=3072,
+        gpu_w=512,
+        gpu_h=384,
+        gpu_d=128,
     )
-    assert plan.total_effective_neurons == 4_000_000 + 4096 * 3072
-    assert plan.gpu_pixels == 4096 * 3072
+    assert plan.total_effective_neurons == 4_000_000 + 512 * 384 * 128
+    assert plan.gpu_pixels == 512 * 384 * 128

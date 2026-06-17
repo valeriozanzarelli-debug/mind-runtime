@@ -10,9 +10,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-# Default risoluzione massima prudente per 8 GB VRAM
-DEFAULT_W = int(os.environ.get("ORGANISM_IMPULSE_W", "4096"))
-DEFAULT_H = int(os.environ.get("ORGANISM_IMPULSE_H", "3072"))
+# Default 3D — 512×384×128 ≈ 25M voxel-neuroni su 8 GB VRAM
+DEFAULT_W = int(os.environ.get("ORGANISM_IMPULSE_W", "512"))
+DEFAULT_H = int(os.environ.get("ORGANISM_IMPULSE_H", "384"))
+DEFAULT_D = int(os.environ.get("ORGANISM_IMPULSE_D", "128"))
 
 
 def memory_path() -> Path:
@@ -28,7 +29,7 @@ class _GpuWorker:
         from organism.brain.gpu_backend import gpu_info
 
         device = os.environ.get("ORGANISM_GPU_WORKER_DEVICE", "cuda")
-        self.impulse = ImpulseScaffold(device=device, width=DEFAULT_W, height=DEFAULT_H)
+        self.impulse = ImpulseScaffold(device=device, width=DEFAULT_W, height=DEFAULT_H, depth=DEFAULT_D)
         self.info = gpu_info()
         self.pulses = 0
         self._memory_file = memory_path()
@@ -111,8 +112,9 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "device": w.info,
-                    "resolution": f"{DEFAULT_W}x{DEFAULT_H}",
-                    "pixels": DEFAULT_W * DEFAULT_H,
+                    "resolution": f"{DEFAULT_W}x{DEFAULT_H}x{DEFAULT_D}",
+                    "pixels": DEFAULT_W * DEFAULT_H * DEFAULT_D,
+                    "spatial": "3d" if DEFAULT_D >= 8 else "2d",
                     "pulses": w.pulses,
                     "memory_path": str(w._memory_file),
                 },
@@ -170,7 +172,7 @@ def main() -> None:
     p.add_argument("--host", default=os.environ.get("ORGANISM_GPU_WORKER_HOST", "0.0.0.0"))
     p.add_argument("--port", type=int, default=int(os.environ.get("ORGANISM_GPU_WORKER_PORT", "8770")))
     args = p.parse_args()
-    print(f"GPU worker {DEFAULT_W}x{DEFAULT_H} = {DEFAULT_W*DEFAULT_H:,} neuroni-pixel")
+    print(f"GPU worker {DEFAULT_W}x{DEFAULT_H}x{DEFAULT_D} = {DEFAULT_W*DEFAULT_H*DEFAULT_D:,} voxel-neuroni")
     print(f"Listening http://{args.host}:{args.port}")
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     server.serve_forever()

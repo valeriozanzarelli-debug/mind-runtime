@@ -58,6 +58,7 @@ class ImpulseBlob:
     vx: float
     vy: float
     region: str
+    z: float = 0.5
 
 
 @dataclass
@@ -479,9 +480,14 @@ class ImpulseField:
         return self._backend != "numpy" and HAS_TORCH and self._torch_dev is not None
 
 
-def create_impulse_field(width: int, height: int, *, device: str = "auto") -> ImpulseField:
+def create_impulse_field(width: int, height: int, *, device: str = "auto", depth: int | None = None) -> ImpulseField:
     import os
 
+    d = depth if depth is not None else int(os.environ.get("ORGANISM_IMPULSE_D", "0"))
+    if d >= 8:
+        from organism.brain.impulse_field_3d import create_impulse_field_3d
+
+        return create_impulse_field_3d(width, height, d, device=device)  # type: ignore[return-value]
     if os.environ.get("ORGANISM_TEMPORAL", "1") != "0":
         from organism.brain.temporal_impulse_field import create_temporal_impulse_field
 

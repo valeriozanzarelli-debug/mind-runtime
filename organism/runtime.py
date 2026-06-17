@@ -155,6 +155,10 @@ class OrganismRuntime:
         return cls._baby_variant("mind_giga", seed=seed, **kwargs)
 
     @classmethod
+    def mind_compact(cls, seed: int = 42, **kwargs) -> OrganismRuntime:
+        return cls._baby_variant("mind_compact", seed=seed, **kwargs)
+
+    @classmethod
     def _baby_variant(cls, name: str, seed: int = 42, **kwargs) -> OrganismRuntime:
         from mind.runtime import MindRuntime
 

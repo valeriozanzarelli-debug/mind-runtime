@@ -1,0 +1,58 @@
+# Mente compact — ~80M neuroni numpy su 16 GB RAM + GPU 3D
+genome_version: "0.1.0-mind-compact"
+species: OrganismMindCompact
+
+scale:
+  compact: true
+  neuron_multiplier: 12000
+  connection_multiplier: 0.85
+  sparse_fan_out_cap: 4
+  energy_budget_per_tick: 1200000
+
+neuron_counts:
+  motion_gesture_emitter: 0
+  song_melody_composer: 4
+  pattern_matcher: 420
+  memory_consolidator: 340
+  emotion_modulator: 200
+  text_semantic_encoder: 192
+  vision_edge_detector: 320
+
+fractal_expansion:
+  enabled: true
+  depth: 4
+  branching_factor: 3
+  neurons_per_leaf: 8
+
+growth_rules:
+  sensory_to_associative:
+    connections_per_neuron: 4
+    pruning_threshold: 0.12
+  pattern_to_memory:
+    connections_per_neuron: 3
+  memory_to_motor:
+    connections_per_neuron: 3
+  associative_to_associative:
+    connections_per_neuron: 2
+    weight_init: small_random
+
+plasticity:
+  hebbian_learning:
+    rate: 0.004
+    decay: 0.0004
+  homeostatic:
+    target_firing_rate: 2.0
+    adjustment_rate: 0.0004
+
+pattern_lexicon: {}
+
+motor_defaults:
+  speech_emotion: calm
+  motion_style: disembodied
+
+mind:
+  locomotion: float_fly
+  body: false
+
+baby:
+  locale: it-IT

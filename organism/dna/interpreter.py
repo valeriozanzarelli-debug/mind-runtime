@@ -57,6 +57,15 @@ class DNAInterpreter:
             conn_mult = float(os.environ["ORGANISM_CONNECTION_MULTIPLIER"])
         fan_cap = int(scale.get("sparse_fan_out_cap", 0))
         brain.energy_budget = int(scale.get("energy_budget_per_tick", 0))
+        if scale.get("compact") or os.environ.get("ORGANISM_COMPACT_BRAIN", "0") == "1":
+            os.environ.setdefault("ORGANISM_COMPACT_BRAIN", "1")
+            if brain.compact is None:
+                try:
+                    from organism.brain.compact_store import CompactNeuralBackend
+
+                    brain.compact = CompactNeuralBackend()
+                except RuntimeError:
+                    pass
         counts: dict[str, int] = self.genome.get("neuron_counts", {})
 
         # 1. Base neuron types
@@ -137,8 +146,12 @@ class DNAInterpreter:
 
         def expand(level: int, parent_tag: str) -> None:
             if level >= depth:
-                for j in range(per_leaf):
-                    brain.add_neuron(layer, template, {"fractal": f"{parent_tag}.{j}", "depth": level})
+                n_leaf = per_leaf
+                if brain.compact and n_leaf >= 50:
+                    brain.add_neurons_bulk(layer, template, n_leaf, force_compact=True)
+                else:
+                    for j in range(n_leaf):
+                        brain.add_neuron(layer, template, {"fractal": f"{parent_tag}.{j}", "depth": level})
                 return
             for b in range(factor):
                 expand(level + 1, f"{parent_tag}_{b}")

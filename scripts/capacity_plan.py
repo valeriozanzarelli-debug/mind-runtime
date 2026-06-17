@@ -41,8 +41,9 @@ def main() -> None:
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
 
-    gw, gh, gpu_mb = recommend_gpu_resolution(args.gpu_vram_gb * 1024)
+    gw, gh, gd, gpu_mb = recommend_gpu_resolution(args.gpu_vram_gb * 1024)
     tier = recommend_graph_tier(args.server_ram_gb)
+    compact = args.variant in ("mind_compact", "ultra_compact")
 
     if args.grow:
         brain = grow_variant(args.variant)
@@ -53,9 +54,10 @@ def main() -> None:
             graph_synapses=budget.synapses,
             gpu_w=gw,
             gpu_h=gh,
+            gpu_d=gd,
+            compact=compact or bool(getattr(brain, "compact", None)),
         )
     else:
-        # stime senza boot pesante
         tinfo = tier["tiers"].get(args.variant, tier["tiers"].get("mind_giga", {}))
         n = int(tinfo.get("neurons", 4_000_000))
         plan = build_capacity_plan(
@@ -64,6 +66,8 @@ def main() -> None:
             graph_synapses=int(n * 4.2),
             gpu_w=gw,
             gpu_h=gh,
+            gpu_d=gd,
+            compact=compact,
         )
         budget = None
 
@@ -91,6 +95,7 @@ def main() -> None:
         "env_gpu_pc": {
             "ORGANISM_IMPULSE_W": gw,
             "ORGANISM_IMPULSE_H": gh,
+            "ORGANISM_IMPULSE_D": gd,
             "ORGANISM_GPU_WORKER_DEVICE": "cuda",
         },
     }
@@ -101,7 +106,7 @@ def main() -> None:
 
     print("=== CERVELLO DELOCALIZZATO — piano capacità ===\n")
     print(f"Server RAM: {args.server_ram_gb} GB  →  variante consigliata: {tier['recommended_variant']}")
-    print(f"GPU locale: {args.gpu_vram_gb} GB  →  campo impulsi {gw}×{gh} = {plan.gpu_pixels:,} neuroni-pixel (~{gpu_mb:.0f} MB VRAM)\n")
+    print(f"GPU locale: {args.gpu_vram_gb} GB  →  campo 3D {gw}×{gh}×{gd} = {plan.gpu_pixels:,} voxel-neuroni (~{gpu_mb:.0f} MB VRAM)\n")
     if budget:
         print(f"Grafo {args.variant}: {budget.total:,} neuroni ({budget.thinking:,} pensiero = {100*budget.thinking_ratio:.1f}%)")
         print(f"  corpo/motorio: {budget.motor_body:,} ({100*budget.body_motor_ratio:.1f}%)  |  linguaggio: {budget.motor_speech:,}")
@@ -109,10 +114,11 @@ def main() -> None:
     else:
         print(f"Grafo stimato ({args.variant}): ~{plan.graph_neurons:,} neuroni (~{plan.graph_thinking:,} pensiero)")
     print(f"\nTOTALE EFFETTIVO: {plan.total_effective_neurons:,} neuroni (grafo + GPU pixel)")
-    print(f"\nCervello umano: {human['human_total_neurons']:,} totali, ma ~{human['human_cerebellum_skipped']:,} nel cerebellum (motorio) che noi NON simuliamo.")
+    print(f"\nCervello umano: {human['human_neurons']:,} totali (~69 mld cerebellum motorio non simulato).")
     print(f"Pensiero umano stimato: ~{human['human_thinking_estimate']:,}  |  nostri neuroni pensiero: {human['our_thinking_neurons']:,}")
+    print(f"\n{human['key_insight']}")
     print("\nAvvio GPU worker (PC locale):")
-    print(f"  ORGANISM_IMPULSE_W={gw} ORGANISM_IMPULSE_H={gh} python3 -m organism.distributed.gpu_worker_server --port 8770")
+    print(f"  ORGANISM_IMPULSE_W={gw} ORGANISM_IMPULSE_H={gh} ORGANISM_IMPULSE_D={gd} python3 -m organism.distributed.gpu_worker_server --port 8770")
     print("\nServer (nursery):")
     print(f"  ORGANISM_DNA_VARIANT={args.variant} ORGANISM_GPU_REMOTE=http://TUO-PC:8770")
 

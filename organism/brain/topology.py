@@ -12,6 +12,14 @@ from organism.brain.neuron import Neuron
 from organism.brain.plasticity import PlasticityEngine
 from organism.brain.synapse import Synapse
 
+try:
+    from organism.brain.compact_store import CompactNeuralBackend, compact_enabled
+
+    HAS_COMPACT = True
+except ImportError:  # pragma: no cover
+    HAS_COMPACT = False
+    compact_enabled = lambda: False  # type: ignore[misc, assignment]
+
 FIRE_THRESHOLD = 0.05
 ACTIVE_FLOOR = 0.01
 LARGE_BRAIN_THRESHOLD = 50_000
@@ -49,10 +57,16 @@ class NeuralTopology:
         # 0 = illimitato; a scala mega limita fan-out per tick (metabolismo)
         self.energy_budget: int = 0
         self.spreading_activation_threshold: float = 0.3
+        self.compact: CompactNeuralBackend | None = None
+        if HAS_COMPACT and compact_enabled():
+            self.compact = CompactNeuralBackend()
 
     @property
     def neuron_count(self) -> int:
-        return len(self.neurons)
+        n = len(self.neurons)
+        if self.compact:
+            n += self.compact.count
+        return n
 
     @property
     def synapse_count(self) -> int:
@@ -77,8 +91,20 @@ class NeuralTopology:
         count: int,
         *,
         meta_fn: Any | None = None,
+        force_compact: bool = False,
     ) -> list[int]:
         """Creazione rapida — milioni di neuroni senza loop Python pesante per meta."""
+        use_compact = (
+            self.compact is not None
+            and layer == "associative"
+            and (force_compact or count >= 1000)
+        )
+        if use_compact:
+            start = self._next_id
+            self._next_id += count
+            ids = self.compact.add_neurons(start, layer, subtype, count)
+            self._by_layer_subtype[(layer, subtype)].extend(ids)
+            return ids
         ids: list[int] = []
         bucket = self._by_layer_subtype[(layer, subtype)]
         for i in range(count):
@@ -142,6 +168,11 @@ class NeuralTopology:
             self.synapses.append(syn)
             self.outgoing[syn.pre_id].append(syn)
             self.incoming[syn.post_id].append(syn)
+            if self.compact and self.compact.count:
+                pre_loc = syn.pre_id in self.compact._id_to_local
+                post_loc = syn.post_id in self.compact._id_to_local
+                if pre_loc and post_loc:
+                    self.compact.add_edges([(syn.pre_id, syn.post_id, syn.weight)])
         return len(batch)
 
     def set_plasticity(self, config: dict) -> None:
@@ -153,6 +184,20 @@ class NeuralTopology:
                 self.neurons[sp.neuron_id].fire(sp.timestamp, sp.intensity)
                 if sp.intensity > ACTIVE_FLOOR:
                     self._active.add(sp.neuron_id)
+            elif self.compact:
+                self.compact.set_activation(
+                    sp.neuron_id,
+                    min(1.0, self.compact.get_activation(sp.neuron_id) + sp.intensity),
+                )
+                if sp.intensity > ACTIVE_FLOOR:
+                    self._active.add(sp.neuron_id)
+
+    def _activation(self, nid: int) -> float:
+        if nid in self.neurons:
+            return self.neurons[nid].activation
+        if self.compact:
+            return self.compact.get_activation(nid)
+        return 0.0
 
     def propagate(self, steps: int = 2, decay: float = 0.12) -> None:
         """Diffusione sparsa — solo neuroni attivi propagano (come corteccia reale)."""
@@ -161,20 +206,24 @@ class NeuralTopology:
             if not self._active:
                 if self.neuron_count < LARGE_BRAIN_THRESHOLD:
                     self._collect_active(FIRE_THRESHOLD)
+                if not self._active and self.compact:
+                    for cid in self.compact.active_ids(FIRE_THRESHOLD):
+                        self._active.add(cid)
                 if not self._active:
                     break
 
             delta: dict[int, float] = defaultdict(float)
             budget = self.energy_budget
             processed = 0
-            # Prima i più attivi — priorità metabolica
             spread_thresh = max(FIRE_THRESHOLD, self.spreading_activation_threshold)
             firing = sorted(
-                (nid for nid in self._active if self.neurons[nid].activation > spread_thresh),
-                key=lambda i: self.neurons[i].activation,
+                (nid for nid in self._active if self._activation(nid) > spread_thresh),
+                key=self._activation,
                 reverse=True,
             )
             for nid in firing:
+                if nid not in self.neurons:
+                    continue
                 pre = self.neurons[nid]
                 for syn in self.outgoing.get(nid, ()):
                     delta[syn.post_id] += syn.transmit(pre.activation)
@@ -184,14 +233,33 @@ class NeuralTopology:
                 if budget and processed >= budget:
                     break
 
+            if self.compact and self.compact.count:
+                py_act = {nid: self._activation(nid) for nid in firing if nid in self.neurons}
+                compact_delta = self.compact.propagate_from_python(
+                    py_act,
+                    self.outgoing,
+                    spread_thresh=spread_thresh,
+                    budget=max(0, (budget - processed)) if budget else 0,
+                )
+                for nid, act in compact_delta.items():
+                    if nid in self.neurons:
+                        delta[nid] += act
+
             touched: set[int] = set(firing)
             next_active: set[int] = set()
             for nid, act in delta.items():
-                n = self.neurons[nid]
-                n.activation = min(1.0, n.activation + act * 0.35)
-                touched.add(nid)
-                if n.activation > FIRE_THRESHOLD:
-                    next_active.add(nid)
+                if nid in self.neurons:
+                    n = self.neurons[nid]
+                    n.activation = min(1.0, n.activation + act * 0.35)
+                    touched.add(nid)
+                    if n.activation > FIRE_THRESHOLD:
+                        next_active.add(nid)
+                elif self.compact:
+                    val = min(1.0, self.compact.get_activation(nid) + act * 0.35)
+                    self.compact.set_activation(nid, val)
+                    touched.add(nid)
+                    if val > FIRE_THRESHOLD:
+                        next_active.add(nid)
 
             for nid in touched:
                 if self.neurons[nid].leak(decay, floor=ACTIVE_FLOOR):
@@ -204,9 +272,14 @@ class NeuralTopology:
                     next_active.add(nid)
 
             self._active = next_active
+            if self.compact:
+                self.compact.leak(decay, floor=ACTIVE_FLOOR)
+                for cid in self.compact.active_ids(spread_thresh):
+                    next_active.add(cid)
 
     def get_neurons(self, layer: str, subtype: str) -> list[Neuron]:
-        return [self.neurons[i] for i in self._by_layer_subtype.get((layer, subtype), [])]
+        ids = self._by_layer_subtype.get((layer, subtype), [])
+        return [self.neurons[i] for i in ids if i in self.neurons]
 
     def get_active_patterns(
         self,
@@ -425,6 +498,7 @@ class NeuralTopology:
             "mean_fan_out": round(fan, 2),
             "energy_budget": self.energy_budget,
             "sparse": True,
+            "compact": self.compact.stats() if self.compact else None,
         }
 
     def _collect_active(self, threshold: float) -> None:

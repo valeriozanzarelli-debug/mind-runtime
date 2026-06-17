@@ -41,6 +41,10 @@ def test_disk_vault_env_flag_not_used_as_path(monkeypatch: pytest.MonkeyPatch, t
 def test_hybrid_fallback_to_local(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ORGANISM_GPU_REMOTE", "http://127.0.0.1:59999")
     monkeypatch.setenv("ORGANISM_IMPULSE", "1")
+    monkeypatch.setenv("ORGANISM_IMPULSE_D", "0")
+    monkeypatch.setenv("ORGANISM_IMPULSE_W", "64")
+    monkeypatch.setenv("ORGANISM_IMPULSE_H", "48")
+    monkeypatch.setenv("ORGANISM_TEMPORAL", "0")
     hybrid = HybridImpulseScaffold(health_ttl_s=0.0)
     with patch("urllib.request.urlopen", side_effect=OSError("offline")):
         reading = hybrid.pulse(steps=1)
@@ -75,6 +79,10 @@ def test_brain_orchestrator_capacity() -> None:
 
 def test_gpu_worker_batch_and_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ORGANISM_GPU_MEMORY", str(tmp_path / "gpu_mem.json"))
+    monkeypatch.setenv("ORGANISM_IMPULSE_W", "64")
+    monkeypatch.setenv("ORGANISM_IMPULSE_H", "48")
+    monkeypatch.setenv("ORGANISM_IMPULSE_D", "0")
+    monkeypatch.setenv("ORGANISM_TEMPORAL", "0")
     from organism.distributed.gpu_worker_server import _GpuWorker
 
     w = _GpuWorker()

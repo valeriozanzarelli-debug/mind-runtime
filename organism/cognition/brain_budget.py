@@ -101,22 +101,34 @@ def analyze_brain(brain) -> LayerBudget:
                 b.motor_body += 1
             elif n.subtype in SPEECH_MOTOR_SUBTYPES:
                 b.motor_speech += 1
+    if getattr(brain, "compact", None) and brain.compact.count:
+        b.associative += brain.compact.count
     b.think_subtypes = sum(subtypes.get(s, 0) for s in THINK_SUBTYPES)
     b.total = brain.neuron_count
     return b
 
 
-def estimate_graph_ram_mb(neurons: int, synapses: int) -> float:
-    """Empirico da benchmark mega (~2.65 KB/neurone incl. sinapsi)."""
+def estimate_graph_ram_mb(neurons: int, synapses: int, *, compact: bool = False) -> float:
+    """RAM grafo — compact ~48 B/neurone vs Python ~2.65 KB."""
+    if compact:
+        return 45 + neurons * 0.000048 + synapses * 0.00000012
     return 45 + neurons * 0.00265 + synapses * 0.00000035
 
 
-def estimate_gpu_field_mb(width: int, height: int, *, temporal: bool = True) -> float:
-    px = width * height
-    tensors = 5
-    mb = px * 4 * tensors / (1024 * 1024)
-    if temporal:
-        mb += px * 4 * 2 / (1024 * 1024)
+def estimate_gpu_field_mb(
+    width: int,
+    height: int,
+    *,
+    depth: int = 1,
+    temporal: bool = True,
+) -> float:
+    voxels = width * height * max(1, depth)
+    tensors = 6 if depth > 1 else 5
+    mb = voxels * 4 * tensors / (1024 * 1024)
+    if temporal and depth <= 1:
+        mb += voxels * 4 * 2 / (1024 * 1024)
+    if depth > 1:
+        mb += voxels * 4 * 1 / (1024 * 1024)  # vz + extra trace
     mb *= 1.35
     return mb
 
@@ -125,9 +137,33 @@ def recommend_gpu_resolution(
     gpu_vram_mb: int = 8192,
     *,
     reserve_mb: int = 2500,
+    max_side: int = 512,
+    depth: int | None = None,
+) -> tuple[int, int, int, float]:
+    """Risoluzione 3D — W×H×D voxel-neuroni per 8 GB VRAM."""
+    import os
+
+    budget = max(512, gpu_vram_mb - reserve_mb)
+    d = depth if depth is not None else int(os.environ.get("ORGANISM_IMPULSE_D", "128"))
+    d = max(8, min(256, d))
+    # ~7 float32 tensors × 1.35 overhead per voxel
+    vox_budget = budget * 1024 * 1024 / (4 * 7 * 1.35)
+    area = vox_budget / d
+    side = int(min(max_side, max(128, area**0.5)))
+    side = (side // 64) * 64
+    w = side
+    h = max(128, int(side * 0.75))
+    h = (h // 64) * 64
+    return w, h, d, estimate_gpu_field_mb(w, h, depth=d)
+
+
+def recommend_gpu_resolution_2d(
+    gpu_vram_mb: int = 8192,
+    *,
+    reserve_mb: int = 2500,
     max_side: int = 4096,
 ) -> tuple[int, int, float]:
-    """Risoluzione campo impulsi — conservativa per 8 GB (compute + doppio buffer)."""
+    """Legacy 2D — mantenuto per compatibilità."""
     budget = max(512, gpu_vram_mb - reserve_mb)
     px_budget = budget * 1024 * 1024 / (4 * 7 * 1.35)
     side = int(min(max_side, max(512, px_budget**0.5)))
@@ -147,7 +183,9 @@ def recommend_graph_tier(server_ram_gb: int = 16, *, reserve_gb: float = 3.5) ->
         "mega": (1_584_000, 13_555_599, 4200),
         "giga": (2_912_000, 15_447_000, 9400),
         "mind_giga": (4_200_000, 16_000_000, 11_500),
+        "mind_compact": (80_000_000, 40_000_000, 4_200),
         "ultra": (5_000_000, 18_000_000, 14_000),
+        "ultra_compact": (200_000_000, 80_000_000, 10_500),
     }
     best = "baby"
     for name, (n, s, ram) in tiers.items():
@@ -168,37 +206,57 @@ def build_capacity_plan(
     graph_synapses: int,
     gpu_w: int,
     gpu_h: int,
+    gpu_d: int = 1,
+    compact: bool = False,
 ) -> CapacityPlan:
-    gpu_px = gpu_w * gpu_h
+    gpu_px = gpu_w * gpu_h * max(1, gpu_d)
     eff = graph_neurons + gpu_px
+    res = f"{gpu_w}x{gpu_h}x{gpu_d}" if gpu_d > 1 else f"{gpu_w}x{gpu_h}"
     notes = [
         "Grafo DNA: neuroni funzionali sparse (pensiero + linguaggio).",
-        "GPU: neuroni-pixel con sinapsi virtuali (kernel conv).",
+        "GPU: neuroni-voxel 3D con sinapsi virtuali (conv3d)." if gpu_d > 1 else "GPU: neuroni-pixel con sinapsi virtuali (kernel conv).",
         f"Rapporto pensiero: {100*graph_thinking/max(1,graph_neurons):.1f}% del grafo.",
+        "Compact numpy: ~48 B/neurone vs ~2.65 KB Python." if compact else "Python objects: ~2.65 KB/neurone.",
         "Cervello umano: ~80% neuroni nel cerebellum (motorio) — noi non lo simuliamo.",
     ]
     return CapacityPlan(
         graph_neurons=graph_neurons,
         graph_thinking=graph_thinking,
-        graph_ram_mb=estimate_graph_ram_mb(graph_neurons, graph_synapses),
+        graph_ram_mb=estimate_graph_ram_mb(graph_neurons, graph_synapses, compact=compact),
         gpu_pixels=gpu_px,
-        gpu_resolution=f"{gpu_w}x{gpu_h}",
-        gpu_ram_mb=estimate_gpu_field_mb(gpu_w, gpu_h),
+        gpu_resolution=res,
+        gpu_ram_mb=estimate_gpu_field_mb(gpu_w, gpu_h, depth=gpu_d),
         total_effective_neurons=eff,
         notes=notes,
     )
 
 
-def human_comparison(our_thinking: int, our_total: int) -> dict[str, Any]:
+def silicon_comparison(our_total: int) -> dict[str, Any]:
+    """Perché i chip hanno miliardi di transistor ma noi partiamo da milioni."""
     return {
-        "human_total_neurons": HUMAN_TOTAL_NEURONS,
-        "human_cerebellum_skipped": HUMAN_CEREBELLUM,
+        "human_neurons": HUMAN_TOTAL_NEURONS,
         "human_thinking_estimate": HUMAN_THINKING_CORTEX,
-        "our_graph_neurons": our_total,
-        "our_thinking_neurons": our_thinking,
-        "our_vs_human_thinking_pct": round(100 * our_thinking / HUMAN_THINKING_CORTEX, 6),
-        "efficiency_note": (
-            "Un neurone digitale associative ≈ circuito mesoscopico; "
-            "sinapsi virtuali + GPU pixel ampliano capacità oltre il conteggio grezzo."
+        "chip_transistors_2024": 19_000_000_000,
+        "our_compute_units": our_total,
+        "transistor_vs_our_neuron_ratio": round(19_000_000_000 / max(1, our_total), 1),
+        "key_insight": (
+            "Un transistor è un interruttore; un nostro «neurone» è un nodo computazionale "
+            "con stato, meta, sinapsi e propagazione — più vicino a un microcircuito. "
+            "Il cervello biologico ha ~7000 sinapsi/neurone ma ogni neurone è analogico "
+            "e massively parallel — non esegue istruzioni sequenziali come CPU/GPU."
         ),
+        "path_to_billions": [
+            "Neuroni compact numpy (~48 B) → 200M+ su 16 GB RAM",
+            "Campo 3D GPU 512×384×128 → 25M voxel-neuroni",
+            "Vault disco illimitato per memoria episodica",
+            "Prossimo: mmap + quantizzazione 8-bit → miliardi su NVMe",
+        ],
     }
+
+
+def human_comparison(our_thinking: int, our_total: int) -> dict[str, Any]:
+    base = silicon_comparison(our_total)
+    base["our_graph_neurons"] = our_total
+    base["our_thinking_neurons"] = our_thinking
+    base["our_vs_human_thinking_pct"] = round(100 * our_thinking / HUMAN_THINKING_CORTEX, 4)
+    return base

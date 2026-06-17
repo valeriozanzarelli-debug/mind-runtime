@@ -11,10 +11,11 @@ from organism.brain.impulse_field import ImpulseField, create_impulse_field
 from organism.brain.impulse_memory import ImpulseMemory
 
 
-def _default_size() -> tuple[int, int]:
+def _default_size() -> tuple[int, int, int]:
     w = int(os.environ.get("ORGANISM_IMPULSE_W", "512"))
     h = int(os.environ.get("ORGANISM_IMPULSE_H", "384"))
-    return w, h
+    d = int(os.environ.get("ORGANISM_IMPULSE_D", "0"))
+    return w, h, d
 
 
 def _text_energies(text: str, dims: int = 64) -> list[float]:
@@ -32,9 +33,15 @@ def _text_energies(text: str, dims: int = 64) -> list[float]:
 class ImpulseScaffold:
     """Codice fisso: gestisce il mare, la coscienza osserva separatamente."""
 
-    def __init__(self, *, device: str = "auto", width: int | None = None, height: int | None = None) -> None:
-        w, h = _default_size() if width is None or height is None else (width, height)
-        self.field = create_impulse_field(w, h, device=device)
+    def __init__(self, *, device: str = "auto", width: int | None = None, height: int | None = None, depth: int | None = None) -> None:
+        w, h, d = _default_size()
+        if width is not None:
+            w = width
+        if height is not None:
+            h = height
+        if depth is not None:
+            d = depth
+        self.field = create_impulse_field(w, h, device=device, depth=d)
         self.consciousness = ImpulseConsciousness()
         self.memory = ImpulseMemory()
         self._last_reading: ConsciousnessReading | None = None

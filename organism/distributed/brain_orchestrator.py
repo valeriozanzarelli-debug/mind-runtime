@@ -27,18 +27,21 @@ class BrainOrchestrator:
 
     def capacity(self) -> dict[str, Any]:
         budget = analyze_brain(self.brain)
-        gw, gh, _ = recommend_gpu_resolution(self.gpu_vram_gb * 1024)
-        gpu_px = gw * gh
+        gw, gh, gd, _ = recommend_gpu_resolution(self.gpu_vram_gb * 1024)
+        gpu_px = gw * gh * gd
         if self.impulse and hasattr(self.impulse, "stats"):
             st = self.impulse.stats()
             if st.get("width") and st.get("height"):
-                gpu_px = int(st["width"]) * int(st["height"])
+                gd = int(st.get("depth", gd))
+                gpu_px = int(st["width"]) * int(st["height"]) * max(1, gd)
         plan = build_capacity_plan(
             graph_neurons=budget.total,
             graph_thinking=budget.thinking,
             graph_synapses=budget.synapses,
             gpu_w=gw,
             gpu_h=gh,
+            gpu_d=gd,
+            compact=bool(getattr(self.brain, "compact", None)),
         )
         vault_eps = self.disk_vault.stats()["episodes"] if self.disk_vault else 0
         return {
