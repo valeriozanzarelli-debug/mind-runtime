@@ -198,16 +198,31 @@ class ImpulseField:
         if not dim_energies:
             return
         y0, y1, x0, x1 = self._region_slice("associative")
-        n = min(len(dim_energies), (y1 - y0) * (x1 - x0))
-        if n <= 0:
+        th, tw = y1 - y0, x1 - x0
+        if th <= 0 or tw <= 0:
             return
-        flat = dim_energies[:n]
+        flat = dim_energies[:64]
+        side = max(1, int(len(flat) ** 0.5))
+        while side * side < len(flat):
+            side += 1
+        padded = flat + [0.0] * (side * side - len(flat))
         if self._is_torch():
-            t = torch.tensor(flat, device=self._torch_dev, dtype=torch.float32).view(y1 - y0, x1 - x0)
+            t = torch.tensor(padded, device=self._torch_dev, dtype=torch.float32).view(side, side)
             t = t / max(1e-6, float(t.max()))
+            t4 = t.unsqueeze(0).unsqueeze(0)
+            scaled = F.interpolate(t4, size=(th, tw), mode="bilinear", align_corners=False).squeeze()
             self.potential[y0:y1, x0:x1] = torch.minimum(
                 torch.tensor(1.0, device=self._torch_dev),
-                self.potential[y0:y1, x0:x1] + t * gain,
+                self.potential[y0:y1, x0:x1] + scaled * gain,
+            )
+        elif HAS_NUMPY and np is not None:
+            patch = np.array(padded, dtype=np.float32).reshape(side, side)
+            patch = patch / max(1e-6, float(patch.max()))
+            ys = np.linspace(0, side - 1, th).astype(int)
+            xs = np.linspace(0, side - 1, tw).astype(int)
+            scaled = patch[ys][:, xs]
+            self.potential[y0:y1, x0:x1] = np.minimum(
+                1.0, self.potential[y0:y1, x0:x1] + scaled * gain
             )
 
     def inject_memory_echo(self, signature: list[float], *, gain: float = 0.25) -> None:
