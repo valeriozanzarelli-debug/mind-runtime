@@ -42,6 +42,7 @@ organism = "organism.cli:main"
 nursery = "organism.nursery.server:main"
 mindruntime = "mindruntime.visualizer:main"
 mindruntime-v2 = "mindruntime.visualizer_v2:main"
+gpu-worker = "organism.distributed.gpu_worker_server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

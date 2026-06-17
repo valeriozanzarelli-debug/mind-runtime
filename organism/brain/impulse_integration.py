@@ -20,6 +20,11 @@ def temporal_enabled() -> bool:
 def create_impulse_scaffold() -> ImpulseScaffold | None:
     if not impulse_enabled():
         return None
+    remote = os.environ.get("ORGANISM_GPU_REMOTE", "").strip()
+    if remote:
+        from organism.distributed.remote_impulse import RemoteImpulseScaffold
+
+        return RemoteImpulseScaffold(remote)  # type: ignore[return-value]
     device = os.environ.get("ORGANISM_IMPULSE_DEVICE", "auto")
     try:
         return ImpulseScaffold(device=device)
