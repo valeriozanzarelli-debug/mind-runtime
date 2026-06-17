@@ -26,22 +26,29 @@ class TrainStepResult:
     message: str = ""
 
 
-class _TinyHead(nn.Module):  # type: ignore[misc]
-    def __init__(self, n_classes: int, spatial: int) -> None:
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(4, 16, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(16, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(32, n_classes),
-        )
-        self._spatial = spatial
+if HAS_TORCH:
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore[name-defined]
-        return self.net(x)
+    class _TinyHead(nn.Module):  # type: ignore[misc]
+        def __init__(self, n_classes: int, spatial: int) -> None:
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Conv2d(4, 16, 3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(16, 32, 3, padding=1),
+                nn.ReLU(),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(32, n_classes),
+            )
+            self._spatial = spatial
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore[name-defined]
+            return self.net(x)
+
+else:
+
+    class _TinyHead:  # type: ignore[no-redef]
+        pass
 
 
 class AITrainer:
