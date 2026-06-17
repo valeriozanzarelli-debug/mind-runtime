@@ -1,6 +1,6 @@
 [project]
 name = "mind-runtime"
-version = "0.8.1"
+version = "0.9.0"
 description = "MIND + ORGANISM — cognitive runtime with DNA-grown neural topology, sensory input, motor output"
 readme = "README.md"
 license = { text = "MIT" }

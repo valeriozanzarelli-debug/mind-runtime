@@ -20,6 +20,7 @@ def _configure_paths() -> None:
     os.environ.setdefault("ORGANISM_BABY_STATE", str(data / "baby_state.json"))
     os.environ.setdefault("ORGANISM_LOCAL_ONLY", "1")
     os.environ.setdefault("ORGANISM_NATIVE", "1")
+    os.environ.setdefault("ORGANISM_ENGINE", "v2")
     os.environ.setdefault("ORGANISM_NO_BROWSER", "1")
 
 

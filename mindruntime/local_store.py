@@ -54,7 +54,7 @@ def save_snapshot(
         "order_parameter": stats.order_parameter,
         "conscious": stats.conscious,
         "phase_transition": stats.phase_transition,
-        "mean_coherence": stats.mean_coherence,
+        "mean_coherence": getattr(stats, "mean_coherence", getattr(stats, "order_parameter", 0.0)),
         "avalanche": stats.avalanche,
         "soc_coupling": stats.soc_coupling,
         "lock_in": stats.lock_in,

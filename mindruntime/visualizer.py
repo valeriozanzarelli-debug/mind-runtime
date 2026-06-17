@@ -9,14 +9,22 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import os
 import sys
 import time
 
 import numpy as np
 
 from mindruntime.cuda_util import cuda_info
-from mindruntime.dendritic_engine import DendriticBrainEngine
 from mindruntime.local_store import append_tick, save_snapshot, store_info
+
+
+def _engine_cls():
+    if os.environ.get("ORGANISM_ENGINE", "v2").lower() in ("legacy", "v1", "dendritic"):
+        from mindruntime.dendritic_engine import DendriticBrainEngine
+        return DendriticBrainEngine
+    from mindruntime.gpu_engine_v2 import BrainEngineV2
+    return BrainEngineV2
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -28,11 +36,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--steps-per-frame", type=int, default=2)
     p.add_argument("--save-every", type=int, default=120, help="tick tra salvataggi automatici")
     p.add_argument("--no-display", action="store_true")
+    p.add_argument("--legacy", action="store_true", help="motore dendritico V1")
     p.add_argument("--max-frames", type=int, default=0)
     return p.parse_args(argv)
-
-
-def main(argv: list[str] | None = None) -> int:
     try:
         import cv2
     except ImportError:
@@ -48,7 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Dati: {paths['dir']}")
     print("  Q o ESC per uscire\n")
 
-    engine = DendriticBrainEngine(width=args.width, height=args.height)
+    if args.legacy:
+        os.environ["ORGANISM_ENGINE"] = "legacy"
+    Engine = _engine_cls()
+    engine = Engine(width=args.width, height=args.height)
     cap = None
     static_bgr: np.ndarray | None = None
     frames = 0
@@ -74,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Webcam non disponibile.", file=sys.stderr)
             return 1
 
-    win = "ORGANISM · locale (Turing+SOC)"
+    win = "ORGANISM · V2 fisica emergente"
     try:
         while True:
             if static_bgr is not None:
