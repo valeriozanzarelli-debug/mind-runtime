@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,15 @@ def _read_manifest() -> dict[str, Any]:
     }
 
 
+def _github_asset_ready(url: str) -> bool:
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status in (200, 302)
+    except Exception:
+        return False
+
+
 def download_info(*, base_path: str = "") -> dict[str, Any]:
     manifest = _read_manifest()
     win = dict(manifest.get("windows") or {})
@@ -38,14 +48,17 @@ def download_info(*, base_path: str = "") -> dict[str, Any]:
     github_url = str(win.get("github_release") or DEFAULT_GITHUB)
     size_mb = round(local.stat().st_size / (1024 * 1024), 1) if local.is_file() else None
     has_local = local.is_file()
+    github_ready = _github_asset_ready(github_url) if not has_local else False
+    download_url = local_url if has_local else (github_url if github_ready else "")
     return {
         "product": manifest.get("product", "ORGANISM"),
         "version": manifest.get("version", "0.5.0"),
         "windows": {
             "filename": filename,
-            "available": has_local,
-            "url": local_url if has_local else "",
+            "available": has_local or github_ready,
+            "url": download_url,
             "mirror_github": github_url,
+            "github_ready": github_ready,
             "local": has_local,
             "size_mb": size_mb,
             "min_windows": win.get("min_windows", "10"),
