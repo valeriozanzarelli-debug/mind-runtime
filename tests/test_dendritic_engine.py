@@ -48,7 +48,7 @@ def test_forward_and_backward_step():
 
 
 def test_dendritic_engine_loop():
-    eng = DendriticBrainEngine(width=64, height=64, match_every=4)
+    eng = DendriticBrainEngine(width=64, height=64)
     frame = (_rgb_spot(64) * 255).astype(np.uint8)
     for _ in range(10):
         eng.step(frame)

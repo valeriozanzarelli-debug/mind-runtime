@@ -1,10 +1,10 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "product": "ORGANISM",
   "windows": {
     "filename": "ORGANISM-Windows.exe",
     "github_release": "https://github.com/valeriozanzarelli-debug/mind-runtime/releases/download/windows-latest/ORGANISM-Windows.exe",
     "min_windows": "10",
-    "notes": "Finestra nativa OpenCV — cervello dendritico Na/K/Ca. Webcam locale. Nessun browser. Stato in %USERPROFILE%\\.organism\\"
+    "notes": "Finestra nativa — Turing+SOC+coscienza emergente. Webcam locale. Nessun browser."
   }
 }

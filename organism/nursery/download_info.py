@@ -19,7 +19,7 @@ def _read_manifest() -> dict[str, Any]:
     if MANIFEST_PATH.is_file():
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     return {
-        "version": "0.7.0",
+        "version": "0.8.0",
         "product": "ORGANISM",
         "windows": {
             "filename": "ORGANISM-Windows.exe",
@@ -52,7 +52,7 @@ def download_info(*, base_path: str = "") -> dict[str, Any]:
     download_url = local_url if has_local else (github_url if github_ready else "")
     return {
         "product": manifest.get("product", "ORGANISM"),
-        "version": manifest.get("version", "0.7.0"),
+        "version": manifest.get("version", "0.8.0"),
         "windows": {
             "filename": filename,
             "available": has_local or github_ready,

@@ -42,7 +42,7 @@ hiddenimports = [
     "mindruntime.gpu_core",
     "mindruntime.resonators",
     "mindruntime.dendritic_core",
-    "mindruntime.dendritic_engine",
+    "mindruntime.physics_core",
     "yaml",
     "PIL",
     "PIL.Image",

@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = _parse_args(argv)
     info = cuda_info()
-    print("ORGANISM · cervello dendritico (solo locale)")
+    print("ORGANISM · fisica emergente (Turing · SOC · lock-in)")
     print(f"  Backend: {'CUDA' if info.get('cuda') else 'CPU'}")
     print(f"  Griglia: {args.width}×{args.height}")
     print("  Q o ESC per uscire — nessun browser.\n")
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Webcam non disponibile.", file=sys.stderr)
             return 1
 
-    win = "ORGANISM · dendriti (Na/K/Ca)"
+    win = "ORGANISM · coscienza emergente (Turing+SOC)"
     frames = 0
     t0 = time.perf_counter()
     try:
