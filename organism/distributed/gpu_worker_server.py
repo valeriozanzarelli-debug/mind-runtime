@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 # Default risoluzione massima prudente per 8 GB VRAM
 DEFAULT_W = int(os.environ.get("ORGANISM_IMPULSE_W", "4096"))
 DEFAULT_H = int(os.environ.get("ORGANISM_IMPULSE_H", "3072"))
+
+
+def memory_path() -> Path:
+    raw = os.environ.get("ORGANISM_GPU_MEMORY", "").strip()
+    if raw:
+        return Path(raw)
+    return Path.home() / ".organism" / "gpu_impulse_memory.json"
 
 
 class _GpuWorker:
@@ -22,6 +31,24 @@ class _GpuWorker:
         self.impulse = ImpulseScaffold(device=device, width=DEFAULT_W, height=DEFAULT_H)
         self.info = gpu_info()
         self.pulses = 0
+        self._memory_file = memory_path()
+        self._load_memory()
+
+    def _load_memory(self) -> None:
+        if not self._memory_file.exists():
+            return
+        try:
+            data = json.loads(self._memory_file.read_text(encoding="utf-8"))
+            self.impulse.load_dict(data)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    def save_memory(self) -> dict[str, Any]:
+        self._memory_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = self.impulse.to_dict()
+        payload["pulses"] = self.pulses
+        self._memory_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"saved": True, "path": str(self._memory_file), "episodes": payload.get("memory", {}).get("stats", {})}
 
     def pulse(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload.get("gray"):
@@ -33,6 +60,8 @@ class _GpuWorker:
         steps = int(payload.get("steps", 2))
         reading = self.impulse.pulse(steps=steps)
         self.pulses += 1
+        if self.pulses % 50 == 0:
+            self.save_memory()
         return {
             "ok": True,
             "pulses": self.pulses,
@@ -43,6 +72,12 @@ class _GpuWorker:
             "workspace": self.impulse.workspace_overlay(),
         }
 
+    def pulse_batch(self, items: list[dict[str, Any]]) -> dict[str, Any]:
+        readings: list[dict[str, Any]] = []
+        for item in items[:32]:
+            readings.append(self.pulse(item))
+        return {"ok": True, "count": len(readings), "readings": readings, "pulses": self.pulses}
+
 
 _worker: _GpuWorker | None = None
 
@@ -51,6 +86,7 @@ def get_worker() -> _GpuWorker:
     global _worker
     if _worker is None:
         _worker = _GpuWorker()
+        atexit.register(lambda: _worker.save_memory() if _worker else None)
     return _worker
 
 
@@ -67,7 +103,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self) -> None:
-        if self.path.rstrip("/") in ("/health", "/api/gpu/health"):
+        path = self.path.rstrip("/")
+        if path in ("/health", "/api/gpu/health"):
             w = get_worker()
             self._json(
                 200,
@@ -77,15 +114,18 @@ class Handler(BaseHTTPRequestHandler):
                     "resolution": f"{DEFAULT_W}x{DEFAULT_H}",
                     "pixels": DEFAULT_W * DEFAULT_H,
                     "pulses": w.pulses,
+                    "memory_path": str(w._memory_file),
                 },
             )
+            return
+        if path in ("/memory", "/api/gpu/memory"):
+            w = get_worker()
+            self._json(200, {"ok": True, "memory": w.impulse.memory.to_dict(), "pulses": w.pulses})
             return
         self._json(404, {"ok": False, "error": "not found"})
 
     def do_POST(self) -> None:
-        if self.path.rstrip("/") not in ("/pulse", "/api/gpu/pulse"):
-            self._json(404, {"ok": False, "error": "not found"})
-            return
+        path = self.path.rstrip("/")
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -93,11 +133,36 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json(400, {"ok": False, "error": "invalid json"})
             return
-        try:
-            out = get_worker().pulse(payload)
-            self._json(200, out)
-        except Exception as exc:
-            self._json(500, {"ok": False, "error": str(exc)[:200]})
+
+        if path in ("/pulse", "/api/gpu/pulse"):
+            try:
+                out = get_worker().pulse(payload)
+                self._json(200, out)
+            except Exception as exc:
+                self._json(500, {"ok": False, "error": str(exc)[:200]})
+            return
+
+        if path in ("/pulse/batch", "/api/gpu/pulse/batch"):
+            items = payload.get("items", [])
+            if not isinstance(items, list):
+                self._json(400, {"ok": False, "error": "items must be a list"})
+                return
+            try:
+                out = get_worker().pulse_batch(items)
+                self._json(200, out)
+            except Exception as exc:
+                self._json(500, {"ok": False, "error": str(exc)[:200]})
+            return
+
+        if path in ("/memory/save", "/api/gpu/memory/save"):
+            try:
+                out = get_worker().save_memory()
+                self._json(200, {"ok": True, **out})
+            except Exception as exc:
+                self._json(500, {"ok": False, "error": str(exc)[:200]})
+            return
+
+        self._json(404, {"ok": False, "error": "not found"})
 
 
 def main() -> None:

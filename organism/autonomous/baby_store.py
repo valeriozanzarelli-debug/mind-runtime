@@ -111,6 +111,7 @@ class BabyStore:
             "working_memory": agent.working_memory.to_dict(),
             "photo_memory": agent.photo_memory.to_dict(),
             "episodic_memory": agent.episodic_memory.to_dict(),
+            "disk_vault": agent.disk_vault.to_dict() if agent.disk_vault else None,
             "narrator": agent.narrator.to_dict(),
             "goal_stack": agent.goal_stack.to_dict(),
             "hypothesis_engine": agent.hypothesis_engine.to_dict(),
@@ -164,6 +165,8 @@ class BabyStore:
         agent.working_memory.load_dict(payload.get("working_memory", {}))
         agent.photo_memory.load_dict(payload.get("photo_memory", {}))
         agent.episodic_memory.load_dict(payload.get("episodic_memory", {}))
+        if payload.get("disk_vault") and agent.disk_vault:
+            agent.disk_vault.load_dict(payload["disk_vault"])
         if payload.get("narrator"):
             agent.narrator.load_dict(payload["narrator"])
         if payload.get("goal_stack"):

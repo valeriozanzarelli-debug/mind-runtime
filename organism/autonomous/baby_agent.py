@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -66,6 +67,8 @@ from organism.cognition.spatial_body import VirtualBodySchema
 from organism.brain.quantum_microtubules import QuantumMicrotubuleLayer
 from organism.teaching.semantic_knowledge import SemanticKnowledge
 from organism.motor.motion import MotionModule, MotionResult
+from organism.cognition.disk_vault import DiskMemoryVault
+from organism.distributed.brain_orchestrator import BrainOrchestrator
 from organism.autonomous.thought_generator import ThoughtGenerator
 from datetime import datetime
 from organism.sensory.vision_sense import VisionSense
@@ -150,6 +153,10 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         self.vision_sense = VisionSense()
         self.dna_evolver = DNAEvolver.load()
         self.impulse = create_impulse_scaffold()
+        self.disk_vault: DiskMemoryVault | None = None
+        if os.environ.get("ORGANISM_DISK_VAULT", "1") != "0":
+            self.disk_vault = DiskMemoryVault()
+        self.brain_orchestrator: BrainOrchestrator | None = None
         self._last_inner_voice = ""
         self._last_thought_coherence = 0.0
         self.basal_ganglia = BasalGanglia()
@@ -320,6 +327,34 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
         interval = cfg.get("thought_loop_interval_s")
         if isinstance(interval, (list, tuple)) and len(interval) == 2:
             self.thought_generator._interval = (float(interval[0]), float(interval[1]))
+        self._sync_brain_orchestrator()
+
+    def _sync_brain_orchestrator(self) -> None:
+        if not self.org:
+            return
+        ram_gb = int(os.environ.get("ORGANISM_SERVER_RAM_GB", "16"))
+        vram_gb = int(os.environ.get("ORGANISM_GPU_VRAM_GB", "8"))
+        self.brain_orchestrator = BrainOrchestrator(
+            brain=self.org.brain,
+            impulse=self.impulse,
+            disk_vault=self.disk_vault,
+            server_ram_gb=ram_gb,
+            gpu_vram_gb=vram_gb,
+        )
+
+    def _episodic_recall_merged(self, query: str = "", *, limit: int = 3) -> list[dict[str, Any]]:
+        hits = self.episodic_memory.recall_context(query, limit=limit)
+        if self.disk_vault and query.strip():
+            disk_hits = self.disk_vault.search(query, limit=limit)
+            seen = {f"{h.get('heard','')}|{h.get('spoke','')}" for h in hits}
+            for row in disk_hits:
+                key = f"{row.get('heard','')}|{row.get('spoke','')}"
+                if key not in seen:
+                    hits.append(row)
+                    seen.add(key)
+                if len(hits) >= limit:
+                    break
+        return hits[:limit]
 
     def _start_thought_loop(self) -> None:
         if not self.org:
@@ -533,7 +568,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 heard,
                 semantic=self.semantic,
                 dialogue_respond=self._dialogue_for_psyche,
-                episodic_recall=self.episodic_memory.recall_context,
+                episodic_recall=self._episodic_recall_merged,
                 wm_context=self.working_memory.context_words(),
                 visual_themes=vis_themes,
             )
@@ -1098,11 +1133,19 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
                 objects=[w for w in thought.themes if self.visual_binder.recognize_object(self._last_visual_features) == w][:3],
                 emotion=str(fc.get("emotion") or ""),
             )
+            if self.disk_vault:
+                self.disk_vault.append_episode(
+                    heard=heard or "",
+                    spoke=spoke or "",
+                    themes=thought.themes[:8],
+                    emotion=str(fc.get("emotion") or ""),
+                    meta={"pulse": self.affect._pulse_count},
+                )
         self._last_presence = pres.to_dict()
         self._last_tone = tone.to_dict()
         thought_d = thought.to_dict()
         ws_d = ws.to_dict()
-        ep_ctx = self.episodic_memory.recall_context(heard or "", limit=1)
+        ep_ctx = self._episodic_recall_merged(heard or "", limit=1)
         mem_line = ""
         if ep_ctx:
             mem_line = str(ep_ctx[0].get("spoke") or ep_ctx[0].get("heard") or "")[:60]
@@ -1231,6 +1274,7 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
 
         if persist:
             self._persist()
+        orch = self.brain_orchestrator.stats() if self.brain_orchestrator else {}
         return {
             "alive": True,
             "brain_tick": org.brain.tick,
@@ -1247,6 +1291,8 @@ class BabyAgent(BabyLifecycleMixin, BabyVisionMixin, BabyHearingMixin, BabyTeach
             "idle_s": round(idle, 1),
             "growth": growth,
             "neurons": org.brain.neuron_count,
+            "architecture": orch,
+            "impulse": impulse_state_dict(self.impulse),
         }
 
     def sense(

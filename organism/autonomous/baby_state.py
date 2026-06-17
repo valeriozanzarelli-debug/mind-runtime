@@ -53,6 +53,12 @@ class BabyStateMixin:
             "working_memory": self.working_memory.stats(),
             "photo_memory": self.photo_memory.stats(),
             "episodic_memory": self.episodic_memory.stats(),
+            "disk_vault": self.disk_vault.stats() if getattr(self, "disk_vault", None) else None,
+            "architecture": (
+                self.brain_orchestrator.architecture_score()
+                if getattr(self, "brain_orchestrator", None)
+                else None
+            ),
             "growth": self.brain_growth.stats(),
             "faces": self.face_binder.stats(),
         }
@@ -87,6 +93,11 @@ class BabyStateMixin:
             "dialogue": self.dialogue_recent(40),
             "neurons": org.brain.neuron_count if org else 0,
             "impulse": impulse_state_dict(getattr(self, "impulse", None)),
+            "architecture": (
+                self.brain_orchestrator.capacity()
+                if getattr(self, "brain_orchestrator", None)
+                else None
+            ),
         }
 
     def state(self) -> dict[str, Any]:

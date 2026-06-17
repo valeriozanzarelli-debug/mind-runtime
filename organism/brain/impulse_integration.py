@@ -21,10 +21,10 @@ def create_impulse_scaffold() -> ImpulseScaffold | None:
     if not impulse_enabled():
         return None
     remote = os.environ.get("ORGANISM_GPU_REMOTE", "").strip()
-    if remote:
-        from organism.distributed.remote_impulse import RemoteImpulseScaffold
+    if remote or os.environ.get("ORGANISM_HYBRID_GPU", "1") != "0":
+        from organism.distributed.hybrid_impulse import HybridImpulseScaffold
 
-        return RemoteImpulseScaffold(remote)  # type: ignore[return-value]
+        return HybridImpulseScaffold(remote)  # type: ignore[return-value]
     device = os.environ.get("ORGANISM_IMPULSE_DEVICE", "auto")
     try:
         return ImpulseScaffold(device=device)
