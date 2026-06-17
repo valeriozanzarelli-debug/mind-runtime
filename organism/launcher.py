@@ -1,4 +1,4 @@
-"""ORGANISM desktop — cervello dendritico nativo, zero browser."""
+"""ORGANISM desktop — native visualizer or nursery HTTP server."""
 
 from __future__ import annotations
 
@@ -19,17 +19,39 @@ def _configure_paths() -> None:
     os.environ.setdefault("ORGANISM_DATA_DIR", str(data))
     os.environ.setdefault("ORGANISM_BABY_STATE", str(data / "baby_state.json"))
     os.environ.setdefault("ORGANISM_LOCAL_ONLY", "1")
-    os.environ.setdefault("ORGANISM_NATIVE", "1")
     os.environ.setdefault("ORGANISM_ENGINE", "v2")
+
+
+def _run_nursery() -> int:
+    """HTTP nursery on 127.0.0.1:8765 — used by Ink Admin plugin."""
     os.environ.setdefault("ORGANISM_NO_BROWSER", "1")
+    # Strip subcommand so argparse in server.main() only sees flags.
+    sys.argv = [sys.argv[0]]
+    from organism.nursery.server import main as run_nursery
+
+    run_nursery()
+    return 0
+
+
+def _run_visualizer() -> int:
+    os.environ.setdefault("ORGANISM_NATIVE", "1")
+    os.environ.setdefault("ORGANISM_NO_BROWSER", "1")
+    from mindruntime.visualizer import main as run_native
+
+    return int(run_native() or 0)
 
 
 def main() -> None:
-    """Avvia finestra OpenCV locale — nessun server HTTP, nessun browser."""
     _configure_paths()
-    from mindruntime.visualizer import main as run_native
-
-    raise SystemExit(run_native())
+    cmd = (sys.argv[1].lower() if len(sys.argv) > 1 else "").strip()
+    if cmd in ("nursery", "serve", "server", "http", "baby"):
+        raise SystemExit(_run_nursery())
+    if cmd in ("viz", "visualizer", "native", ""):
+        raise SystemExit(_run_visualizer())
+    # Unknown arg — default nursery when spawned as sidecar from Ink Admin.
+    if getattr(sys, "frozen", False) and cmd and not cmd.startswith("-"):
+        raise SystemExit(_run_nursery())
+    raise SystemExit(_run_visualizer())
 
 
 if __name__ == "__main__":
