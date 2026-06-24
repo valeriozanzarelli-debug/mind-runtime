@@ -1,0 +1,70 @@
+genome_version: "1.0.0"
+species: InkBiologicalBrain
+description: "Architettura biologica definitiva — ~23.8k neuroni, 7 sistemi"
+
+# ── 1. Sensory Input System (4_300) ──
+neuron_counts:
+  auditory_cortex: 2000
+  visual_cortex: 1500
+  proprioceptive: 500
+  interoceptive: 300
+  # ── 2. Integration Core (9_000) ──
+  association_cortex: 5000
+  temporal_lobe: 3000
+  insula: 1000
+  # ── 3. Prefrontal + Limbic (4_300) ──
+  prefrontal_cortex: 3000
+  anterior_cingulate: 500
+  amygdala: 300
+  dopamine_neurons: 500
+  # ── 4. Language (3_000) ──
+  wernicke: 1500
+  broca: 1000
+  motor_cortex: 500
+  # ── 5. Consciousness Loop (3_200) ──
+  thalamic_relay: 2000
+  posterior_cingulate: 400
+  temporo_parietal_junction: 300
+  consciousness_integrator: 500
+
+energy_budget: 0  # 0 = unlimited
+
+plasticity:
+  hebbian_learning:
+    rate: 0.01
+    decay: 0.001
+  spike_timing_dependent:
+    window_ms: 20
+    potentiation: 0.05
+    depression: 0.02
+  homeostatic:
+    target_firing_rate: 5.0
+    adjustment_rate: 0.001
+
+consciousness:
+  ignition_threshold: 0.35
+  always_on: true
+  pulse_interval_s: 0.8
+
+information_flow:
+  - sensory
+  - thalamic_relay
+  - integration
+  - prefrontal_limbic
+  - language
+  - motor_cortex
+
+feedback_loops:
+  prediction_error:
+    source: prefrontal_cortex
+    target: dopamine_neurons
+    modulates: stdp
+  dopamine_stdp:
+    source: dopamine_neurons
+    targets: [association_cortex, prefrontal_cortex, temporal_lobe]
+  top_down:
+    source: prefrontal_cortex
+    targets: [auditory_cortex, visual_cortex, thalamic_relay]
+  consciousness_gate:
+    source: consciousness_integrator
+    target: thalamic_relay

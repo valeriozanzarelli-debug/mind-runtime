@@ -1,0 +1,30 @@
+[project]
+name = "mind-runtime"
+version = "1.0.0"
+description = "Biological neural brain — 22k neurons, GPU-capable, consciousness loop"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+gpu = ["torch>=2.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+organism = "organism.cli:main"
+nursery = "organism.nursery.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["organism*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
