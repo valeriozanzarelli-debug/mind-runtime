@@ -1,0 +1,56 @@
+name: build-cerebrum-windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cerebrum/**"
+      - "scripts/**"
+      - "packaging/**"
+      - "releases/manifest.json"
+      - ".github/workflows/build-windows.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime + build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[vision]"
+          pip install pyinstaller
+          # torch CPU per il build; sul PC dell'utente con CUDA userà la GPU.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Build cerebrum.exe
+        run: pyinstaller --clean --noconfirm packaging/cerebrum_windows.spec
+
+      - name: Assemble package
+        shell: pwsh
+        run: |
+          $pkg = "package/CEREBRUM"
+          New-Item -ItemType Directory -Force -Path "$pkg/scripts" | Out-Null
+          Copy-Item dist/cerebrum.exe "$pkg/cerebrum.exe"
+          Copy-Item scripts/serve_local.mjs "$pkg/scripts/serve_local.mjs"
+          Copy-Item START_WINDOWS.bat "$pkg/START_WINDOWS.bat"
+          Copy-Item START_WINDOWS.ps1 "$pkg/START_WINDOWS.ps1"
+          Copy-Item README.md "$pkg/README.md"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "CEREBRUM-Windows.zip" -Force
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cerebrum-latest
+          name: CEREBRUM Windows (latest)
+          prerelease: true
+          files: CEREBRUM-Windows.zip

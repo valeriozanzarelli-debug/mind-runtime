@@ -1,0 +1,15 @@
+{
+  "name": "CEREBRUM",
+  "version": "1.0.0",
+  "channel": "stable",
+  "notes": "Runtime cerebrale locale su GPU. Loop vitale continuo, omeostasi, riflessi neonatali, visione webcam, lallazione, introspezione.",
+  "windows": {
+    "filename": "CEREBRUM-Windows.zip",
+    "github_release": "https://github.com/valeriozanzarelli-debug/mind-runtime/releases/download/cerebrum-latest/CEREBRUM-Windows.zip",
+    "entry": "scripts/serve_local.mjs",
+    "exe": "cerebrum.exe",
+    "port": 8788,
+    "size_mb": 0
+  },
+  "endpoints": ["/health", "/ready", "/status", "/introspect", "/consciousness", "/chat", "/train", "/hear", "/see", "/care", "/power"]
+}
