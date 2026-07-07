@@ -34,6 +34,11 @@ class EpisodicMemory:
     def salient(self, n: int = 10):
         return sorted(self.episodes, key=lambda e: e["salience"], reverse=True)[:n]
 
+    def salient_with_vectors(self, n: int = 8):
+        """Episodi salienti che portano un vettore sensoriale (per il replay)."""
+        withv = [e for e in self.episodes if e.get("meta", {}).get("vec")]
+        return sorted(withv, key=lambda e: e["salience"], reverse=True)[:n]
+
     def recall(self, cue: str) -> Optional[dict]:
         cue = cue.lower()
         best, score = None, 0.0

@@ -10,31 +10,55 @@ sopravvivenza di base (omeostasi, neurochimica, drives, riflessi neonatali),
 sensi (visione da webcam, udito/linguaggio) e un apparato motorio vocale che
 lallazione dopo lallazione impara a imitare le parole.
 
-## Architettura
+## Architettura (v2 — principi di un cervello vero)
 
 ```
 Sensi (webcam, testo/voce)
       │  corrente sensoriale
       ▼
-Campo neurale  ──►  spiking LIF ricorrente + plasticità Hebbian   [GPU: torch/CUDA, fallback numpy]
-      ▲                                    │ attività, Φ
-      │ modulazione                        ▼
+Campo neurale STRUTTURATO in regioni     [GPU: torch/CUDA, fallback numpy]
+  sensory → thalamus → association → hippocampus → prefrontal
+  sinapsi SPARSE event-driven · E/I balance · plasticità a 3 fattori
+      ▲                                    │ attività, Φ, stato associativo
+      │ modulazione + top-down             ▼
+Predictive coding: predice il prossimo istante, l'ERRORE = sorpresa
+      │  (a occhi chiusi immagina → pensiero continuo)
+      ▼
 Corpo:  neurochimica · omeostasi · drives · riflessi neonatali
-      │                                    │
-      ▼                                    ▼
-Mente:  memoria episodica · flusso di coscienza  ──►  Motore vocale (lallazione → parole)
+      ▼
+Mente:  memoria episodica + REPLAY nel sonno · sviluppo a stadi · coscienza
+      ▼
+Motore vocale:  versi → lallazione → imitazione → parole → frasi (per stadio)
 ```
 
-- `cerebrum/neuro/field.py` — substrato neurale (GPU): neuroni LIF, sinapsi
-  plastiche, attività spontanea di fondo, stima di Φ.
-- `cerebrum/body/` — neurochimica (dopamina, serotonina, cortisolo, ossitocina…),
-  omeostasi (fame, energia, stanchezza, temperatura, dolore), drives (curiosità,
-  attaccamento, esplorazione), riflessi neonatali (Moro, rooting, orienting, pianto…).
-- `cerebrum/sense/` — visione (retina dai frame webcam: luminosità, movimento,
-  contrasto), linguaggio (token → stimolo, lessico esperienziale).
-- `cerebrum/motor/speech.py` — vocalizzazione emergente.
-- `cerebrum/mind/` — memoria episodica con consolidamento nel sonno, flusso di coscienza.
-- `cerebrum/brain.py` — assembla tutto in un loop vitale continuo, thread-safe.
+Le sei fondamenta implementate:
+
+1. **Connettoma strutturato** — il campo è diviso in regioni con ruoli
+   (talamo=hub/attenzione, corteccia sensoriale/associativa, ippocampo=memoria,
+   prefrontale=controllo top-down) cablate tra loro, non una zuppa uniforme.
+2. **Sinapsi sparse event-driven** — propagano solo i neuroni che sparano
+   (~O(spike·fanout), non O(N²)): è così che un cervello resta efficiente.
+3. **E/I balance** — ~20% neuroni inibitori con guadagno che stabilizza
+   l'attività su un regime critico (riposo ~5%, come la corteccia).
+4. **Plasticità a tre fattori** — STDP con tracce di eleggibilità che diventano
+   apprendimento solo col terzo fattore, la dopamina (ricompensa/sorpresa).
+   Apprendimento locale, online, senza backprop globale.
+5. **Predictive coding** — predice l'input e reagisce all'errore; senza stimoli
+   immagina (pensa a occhi chiusi). La sorpresa alimenta curiosità e dopamina.
+6. **Sviluppo + replay nel sonno** — capacità sbloccate a stadi (neonato →
+   lallazione → imitazione → parole → frasi); nel sonno rivive i ricordi
+   salienti per consolidare (imparare molto da poche esperienze).
+
+File chiave:
+
+- `cerebrum/neuro/field.py` — substrato neurale a regioni (GPU).
+- `cerebrum/mind/predictive.py` — predictive coding / immaginazione.
+- `cerebrum/mind/development.py` — stadi di sviluppo.
+- `cerebrum/body/` — neurochimica, omeostasi, drives, riflessi neonatali.
+- `cerebrum/sense/` — visione webcam, linguaggio.
+- `cerebrum/motor/speech.py` — vocalizzazione emergente per stadio.
+- `cerebrum/mind/` — memoria episodica + replay, flusso di coscienza.
+- `cerebrum/brain.py` — loop vitale continuo, thread-safe.
 - `cerebrum/server.py` — server HTTP locale (`127.0.0.1:8788`).
 
 ## Avvio
