@@ -10,7 +10,7 @@
 // Tutto gira in locale: nessun processo su server remoto.
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
@@ -21,11 +21,16 @@ const port = process.env.CEREBRUM_PORT || "8788";
 const isWin = process.platform === "win32";
 
 function candidateExe() {
-  const names = isWin ? ["cerebrum.exe", "CEREBRUM.exe"] : ["cerebrum"];
+  // Solo su Windows cerchiamo l'EXE impacchettato. Su Linux/macOS il nome
+  // "cerebrum" coincide con la cartella del package, quindi verifichiamo che
+  // il candidato sia un FILE, non una directory.
+  const names = isWin ? ["cerebrum.exe", "CEREBRUM.exe"] : ["cerebrum.bin"];
   for (const dir of [root, join(root, "bin"), join(root, "dist"), __dirname]) {
     for (const n of names) {
       const p = join(dir, n);
-      if (existsSync(p)) return p;
+      try {
+        if (existsSync(p) && statSync(p).isFile()) return p;
+      } catch {}
     }
   }
   return null;
