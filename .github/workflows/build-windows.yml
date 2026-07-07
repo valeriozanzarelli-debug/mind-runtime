@@ -44,6 +44,7 @@ jobs:
           Copy-Item scripts/serve_local.mjs "$pkg/scripts/serve_local.mjs"
           Copy-Item START_WINDOWS.bat "$pkg/START_WINDOWS.bat"
           Copy-Item START_WINDOWS.ps1 "$pkg/START_WINDOWS.ps1"
+          Copy-Item SETUP_GPU_WINDOWS.ps1 "$pkg/SETUP_GPU_WINDOWS.ps1"
           Copy-Item README.md "$pkg/README.md"
           Compress-Archive -Path "$pkg/*" -DestinationPath "CEREBRUM-Windows.zip" -Force
 
