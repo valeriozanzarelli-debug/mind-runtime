@@ -9,7 +9,7 @@
 //
 // Tutto gira in locale: nessun processo su server remoto.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,36 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const port = process.env.CEREBRUM_PORT || "8788";
 const isWin = process.platform === "win32";
+
+// Preferenza runtime: auto | python | exe (env CEREBRUM_RUNTIME).
+// In "auto" usiamo Python SOLO se ha una GPU CUDA disponibile (per sfruttarla),
+// altrimenti l'EXE impacchettato. Cosi', dopo SETUP_GPU_WINDOWS.ps1, lo stesso
+// "Avvia" di Ink Admin gira sulla GPU senza altre modifiche.
+const runtimePref = (process.env.CEREBRUM_RUNTIME || "auto").toLowerCase();
+
+function pythonCmd() {
+  return isWin ? "python" : (process.env.PYTHON || "python3");
+}
+
+function pythonHasCuda() {
+  try {
+    const r = spawnSync(pythonCmd(),
+      ["-c", "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)"],
+      { timeout: 20000 });
+    return r.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function pythonHasCerebrum() {
+  try {
+    const r = spawnSync(pythonCmd(), ["-c", "import cerebrum"], { timeout: 20000 });
+    return r.status === 0;
+  } catch {
+    return false;
+  }
+}
 
 function candidateExe() {
   // Solo su Windows cerchiamo l'EXE impacchettato. Su Linux/macOS il nome
@@ -36,16 +66,30 @@ function candidateExe() {
   return null;
 }
 
+function decideMode() {
+  const exe = candidateExe();
+  if (runtimePref === "python") return { mode: "python" };
+  if (runtimePref === "exe") return exe ? { mode: "exe", exe } : { mode: "python" };
+  // auto: se python ha CUDA e il package cerebrum, usa la GPU via Python
+  if (pythonHasCerebrum() && pythonHasCuda()) return { mode: "python", gpu: true };
+  if (exe) return { mode: "exe", exe };
+  return { mode: "python" };
+}
+
 function launch() {
   const env = { ...process.env, CEREBRUM_PORT: String(port) };
-  const exe = candidateExe();
+  const decision = decideMode();
   let child;
-  if (exe) {
-    console.log(`[cerebrum] avvio EXE: ${exe} (porta ${port})`);
-    child = spawn(exe, ["serve", "--port", String(port)], { cwd: root, env, stdio: "inherit" });
+  if (decision.mode === "exe") {
+    console.log(`[cerebrum] avvio EXE (CPU): ${decision.exe} (porta ${port})`);
+    child = spawn(decision.exe, ["serve", "--port", String(port)], { cwd: root, env, stdio: "inherit" });
   } else {
-    const py = isWin ? "python" : (process.env.PYTHON || "python3");
-    console.log(`[cerebrum] avvio: ${py} -m cerebrum serve --port ${port}`);
+    const py = pythonCmd();
+    if (decision.gpu) {
+      console.log(`[cerebrum] avvio su GPU: ${py} -m cerebrum serve --port ${port}`);
+    } else {
+      console.log(`[cerebrum] avvio: ${py} -m cerebrum serve --port ${port}`);
+    }
     child = spawn(py, ["-m", "cerebrum", "serve", "--port", String(port)], {
       cwd: root, env, stdio: "inherit",
     });
